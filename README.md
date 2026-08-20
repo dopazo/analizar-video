@@ -124,19 +124,25 @@ Plantilla en [`references/formato_contexto.md`](.claude/skills/analizar-video/re
 
 ### Claude Code
 
-La skill vive en `.claude/skills/analizar-video/`, así que **al clonar este repo
-ya está disponible**: se detecta sola al abrir el proyecto.
-
-Para usarla en cualquier otro proyecto, copia esa carpeta a tus skills
-personales:
+Un comando, sin clonar el repo. Descarga solo la carpeta de la skill y la deja
+en tus skills personales, disponible en cualquier proyecto:
 
 ```bash
 # Linux / macOS
-cp -r .claude/skills/analizar-video ~/.claude/skills/
-
-# Windows (PowerShell)
-Copy-Item -Recurse .claude\skills\analizar-video "$env:USERPROFILE\.claude\skills\"
+mkdir -p ~/.claude/skills && curl -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz \
+  | tar -xz -C ~/.claude/skills --strip-components=3 analizar-video-main/.claude/skills/analizar-video
 ```
+
+```powershell
+# Windows (PowerShell)
+mkdir -Force "$env:USERPROFILE\.claude\skills" | Out-Null
+curl.exe -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz `
+  | tar -xz -C "$env:USERPROFILE\.claude\skills" --strip-components=3 analizar-video-main/.claude/skills/analizar-video
+```
+
+Si prefieres clonar el repo completo, la skill ya vive en
+`.claude/skills/analizar-video/`, así que **queda disponible al abrir el
+proyecto** sin copiar nada.
 
 ### Otros agentes
 

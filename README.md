@@ -14,21 +14,16 @@ instrucciones le enseña al agente cuándo y cómo usarlos.
 
 ## Instalar
 
-Un comando, sin clonar el repo. Deja la skill en tus skills personales,
-disponible en cualquier proyecto:
+Párate en la carpeta donde quieras la skill —`~/.claude/skills/` para tenerla en
+todos tus proyectos— y descárgala sin clonar el repo:
 
 ```bash
-# Linux / macOS
-mkdir -p ~/.claude/skills && curl -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz \
-  | tar -xz -C ~/.claude/skills --strip-components=3 analizar-video-main/.claude/skills/analizar-video
+curl -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz \
+  | tar -xz --strip-components=3 analizar-video-main/.claude/skills/analizar-video
 ```
 
-```powershell
-# Windows (PowerShell)
-mkdir -Force "$env:USERPROFILE\.claude\skills" | Out-Null
-curl.exe -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz `
-  | tar -xz -C "$env:USERPROFILE\.claude\skills" --strip-components=3 analizar-video-main/.claude/skills/analizar-video
-```
+En PowerShell es el mismo comando, con `curl.exe` en vez de `curl` (`curl` a
+secas es un alias de `Invoke-WebRequest` y rompe el pipe).
 
 Requiere [uv](https://docs.astral.sh/uv/) y `ffmpeg`; el detalle está en
 [Requisitos](#requisitos).

@@ -12,6 +12,27 @@ Son cuatro scripts de Python sin estado y un archivo de instrucciones. Los
 scripts los puede invocar cualquier agente —o tú a mano—; el archivo de
 instrucciones le enseña al agente cuándo y cómo usarlos.
 
+## Instalar
+
+Un comando, sin clonar el repo. Deja la skill en tus skills personales,
+disponible en cualquier proyecto:
+
+```bash
+# Linux / macOS
+mkdir -p ~/.claude/skills && curl -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz \
+  | tar -xz -C ~/.claude/skills --strip-components=3 analizar-video-main/.claude/skills/analizar-video
+```
+
+```powershell
+# Windows (PowerShell)
+mkdir -Force "$env:USERPROFILE\.claude\skills" | Out-Null
+curl.exe -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz `
+  | tar -xz -C "$env:USERPROFILE\.claude\skills" --strip-components=3 analizar-video-main/.claude/skills/analizar-video
+```
+
+Requiere [uv](https://docs.astral.sh/uv/) y `ffmpeg`; el detalle está en
+[Requisitos](#requisitos).
+
 ## Qué puedes pedirle
 
 ```
@@ -120,29 +141,12 @@ Plantilla en [`references/formato_contexto.md`](.claude/skills/analizar-video/re
   lejano dan transcripciones con tramos incomprensibles, por más glosario que
   haya.
 
-## Instalación
+## Otras formas de instalar
 
-### Claude Code
+### Clonando el repo
 
-Un comando, sin clonar el repo. Descarga solo la carpeta de la skill y la deja
-en tus skills personales, disponible en cualquier proyecto:
-
-```bash
-# Linux / macOS
-mkdir -p ~/.claude/skills && curl -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz \
-  | tar -xz -C ~/.claude/skills --strip-components=3 analizar-video-main/.claude/skills/analizar-video
-```
-
-```powershell
-# Windows (PowerShell)
-mkdir -Force "$env:USERPROFILE\.claude\skills" | Out-Null
-curl.exe -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz `
-  | tar -xz -C "$env:USERPROFILE\.claude\skills" --strip-components=3 analizar-video-main/.claude/skills/analizar-video
-```
-
-Si prefieres clonar el repo completo, la skill ya vive en
-`.claude/skills/analizar-video/`, así que **queda disponible al abrir el
-proyecto** sin copiar nada.
+La skill ya vive en `.claude/skills/analizar-video/`, así que al clonar **queda
+disponible al abrir el proyecto** sin copiar nada.
 
 ### Otros agentes
 
@@ -152,10 +156,12 @@ completa, los comandos y las reglas.
 
 Los ejemplos de este README usan `.claude/skills/analizar-video/` como ruta.
 
-### Verifica el entorno
+## Entorno
+
+### Verifica que esté todo
 
 ```bash
-uv run .claude/skills/analizar-video/scripts/check_env.py
+uv run ~/.claude/skills/analizar-video/scripts/check_env.py
 ```
 
 Te dice si falta `ffmpeg`, si hay GPU NVIDIA utilizable, qué modelos tienes

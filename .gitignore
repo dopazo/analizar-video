@@ -1,0 +1,45 @@
+# --- Config local ---
+spec_transcripcion.md
+CLAUDE.local.md
+.claude/settings.local.json
+
+# --- Material de trabajo ---
+
+# Video y audio
+*.mov
+*.mp4
+*.mkv
+*.avi
+*.webm
+*.m4v
+*.wmv
+*.flv
+*.mpg
+*.mpeg
+*.mp3
+*.m4a
+*.wav
+*.flac
+*.ogg
+*.opus
+*.aac
+*.wma
+
+# Artefactos generados por la skill: todo va a <video>_analisis/
+*_analisis/
+contexto_video.md
+glosario.md
+
+# Por si alguien uso --output-dir o corrio una version anterior de la skill,
+# que dejaba los artefactos sueltos junto al video.
+*_transcripcion_*.txt
+*_resumen_*.md
+*_indice_*.md
+*_frames/
+*_audio.*
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+uv.lock

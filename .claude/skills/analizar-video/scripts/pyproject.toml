@@ -1,0 +1,31 @@
+[project]
+name = "analizar-video-scripts"
+version = "0.1.0"
+description = "Scripts de transcripcion y extraccion de frames para la skill analizar-video"
+requires-python = ">=3.9"
+dependencies = [
+    "faster-whisper>=1.0.0",
+]
+
+[project.optional-dependencies]
+# GPU: tener driver NVIDIA no alcanza. CTranslate2 carga cuBLAS y cuDNN en
+# tiempo de ejecucion y, si faltan, el fallo aparece recien al transcribir
+# ("cublas64_12.dll is not found"). transcribe.py lo detecta y sigue en CPU,
+# pero para usar la GPU de verdad hay que instalar esto.
+gpu = [
+    "nvidia-cublas-cu12",
+    "nvidia-cudnn-cu12>=9,<10",
+]
+
+# Nota sobre CUDA 11:
+# Las versiones recientes de ctranslate2 requieren CUDA 12 + cuDNN 9. Si
+# check_env.py reporta que el driver expone CUDA 11, descomenta el pin de abajo
+# (o corre en CPU, que no necesita nada de esto).
+#
+# dependencies = [
+#     "faster-whisper>=1.0.0",
+#     "ctranslate2==3.24.0",
+# ]
+
+[tool.setuptools]
+py-modules = []

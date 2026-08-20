@@ -1,0 +1,15 @@
+# Normaliza los fines de linea: LF en el repo, lo que corresponda al SO en el
+# working copy. Sin esto, editar desde Windows y desde Linux/macOS produce
+# diffs completos por cambio de CRLF/LF.
+* text=auto eol=lf
+
+# Binarios: git no debe tocarlos.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.mp4 binary
+*.mov binary
+*.mkv binary
+*.m4a binary
+*.mp3 binary
+*.wav binary

@@ -31,6 +31,12 @@ Ante la duda, pregunta qué le sirve más antes de escribir uno largo.
   proyecto.
 - Si el transcript tiene términos del glosario mal transcritos, ofrece corregir
   antes de resumir (paso 3 de la ruta canónica).
+- **Mira algunos frames antes de escribir**, sin preguntar: es parte de resumir,
+  no un extra opcional. Un sondeo ralo de 3 a 6 capturas
+  repartidas por el video basta para saber si hubo pantalla compartida, una demo
+  o un documento en revisión —cosas que el transcript no registra y que cambian
+  de qué trata realmente el video—. Trata lo que veas como contexto del resumen.
+  Ver "Sondeo visual antes de resumir o explicar" en `SKILL.md`.
 
 ## Levantamiento de requerimientos con cliente
 

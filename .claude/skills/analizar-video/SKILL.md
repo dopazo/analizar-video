@@ -6,8 +6,8 @@ description: Transcribe videos y audios locales (reuniones, levantamientos con c
 # analizar-video
 
 Transcribe una sola vez en local y responde todas las preguntas siguientes
-contra el texto. Solo se extraen frames del video cuando el transcript no
-alcanza. Los artefactos quedan **junto al video**, no en una caché oculta.
+contra el texto. Los frames son apoyo: se extraen cuando el transcript no
+alcanza, y como sondeo ralo antes de resumir o explicar un video. Los artefactos quedan **junto al video**, no en una caché oculta.
 
 ## Ruta canónica
 
@@ -21,7 +21,7 @@ encadenes pasos por tu cuenta.
 | 1 | **Verificar entorno** (`check_env.py`) | Primera corrida, o si algo falla. Si ya está listo, no molestar |
 | 2 | **Transcribir** (`transcribe.py`) | Siempre, salvo que ya exista transcripción reutilizable |
 | 3 | **Corregir términos** | Siempre después de transcribir: corre `revisar_terminos.py` y revisa la tabla |
-| 4 | **Responder / resumir** | Según lo pedido. Al resumir, mencionar que queda un `.md` en `<video>_analisis/` |
+| 4 | **Responder / resumir** | Según lo pedido. Resumir o explicar incluye el **sondeo visual** (ver abajo), no es un paso aparte. Al resumir, mencionar que queda un `.md` en `<video>_analisis/` |
 | 5 | **Índice de temas** | En videos largos, donde navegar el transcript se vuelve incómodo |
 | 6 | **Frames de apoyo** | Si la pregunta toca contenido visual, o si un walkthrough gana con capturas |
 
@@ -145,6 +145,30 @@ uv run scripts/extract_frame.py charla.mov --at 00:22:30 --crop 875:175:800:450
   archivo** para que el usuario pueda abrirlo y verificar.
 - Si el archivo es solo audio, el script avisa que no hay pista de video: dilo
   claramente en vez de insistir.
+
+### Sondeo visual antes de resumir o explicar
+
+Lo anterior aplica a preguntas puntuales. Cuando la tarea es **analizar** el
+video —resumir, armar un acta, explicar un proceso—, conviene mirar unos pocos
+frames *antes* de escribir, aunque nadie haya preguntado nada visual. El
+transcript no dice si alguien estuvo veinte minutos compartiendo pantalla, y un
+resumen escrito a ciegas de eso describe la conversación y se pierde la mitad
+del contenido.
+
+- **Cuándo**: una sola vez, después de transcribir y antes de redactar. Es parte
+  del trabajo de resumir, no un paso que se ofrece: hazlo sin preguntar, igual
+  que leer el transcript. La regla de no encadenar pasos aplica entre pasos de
+  la ruta, no dentro de uno.
+- **Cuánto**: un muestreo ralo, del orden de 3 a 6 frames repartidos a lo largo
+  del video, apuntando a los tramos que el transcript marca como importantes
+  (una demo, un "miren esto", un cambio de tema). No es un barrido.
+- **Para qué**: decidir si hay una capa visual que el resumen deba considerar.
+  Si los frames muestran solo caras o cámaras apagadas, dilo y sigue con el
+  resumen en modo texto, sin extraer más.
+- **Si la hay**: trata lo visto como contexto del resumen —qué herramienta se
+  estaba usando, qué documento se revisaba— y extrae frames adicionales en los
+  puntos concretos que valga la pena mostrar, con las reglas de arriba.
+- Sáltalo sin comentarios si el input es solo audio.
 
 No hay regla fija sobre cómo leer el transcript (completo vs. buscar y leer el
 tramo): decide según la pregunta, el largo del archivo y el contexto disponible.

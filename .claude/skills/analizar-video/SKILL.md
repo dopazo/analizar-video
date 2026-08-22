@@ -154,6 +154,12 @@ tramo): decide según la pregunta, el largo del archivo y el contexto disponible
 - **No atribuyas declaraciones a personas.** No hay diarización, así que no se
   sabe quién habla. Cita con timestamp: "en [00:12:30] se plantea que…". Un acta
   sin nombres es mejor que un acta con nombres equivocados.
+- **Formato fijo de timestamp: `[HH:MM:SS]`**, dos dígitos por campo, con las
+  horas siempre presentes aunque sean `00` (`[00:04:42]`, nunca `[4:42]` ni
+  `(00:04:42)`). Los rangos se escriben como dos marcas unidas por guion:
+  `[00:04:42]-[00:05:10]`. Es un formato parseable: se apunta a que un
+  reproductor pueda convertir cada marca en un salto al segundo exacto, así que
+  no lo varíes por estética.
 - **El `.txt` crudo nunca se modifica.** Si detectas términos del glosario mal
   transcritos, *ofrece* generar
   `<video>_transcripcion_yymmdd_hhmmss_corregido.txt`; no lo apliques solo.

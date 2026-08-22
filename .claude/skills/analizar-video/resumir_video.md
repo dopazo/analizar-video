@@ -16,6 +16,12 @@ Ante la duda, pregunta qué le sirve más antes de escribir uno largo.
 
 - **Cita con timestamp** todo lo que sea comprometedor (un requerimiento, una
   decisión, un plazo), para poder volver al audio y verificar.
+- **Siempre en formato `[HH:MM:SS]`**, dos dígitos por campo y con las horas
+  aunque sean `00` (`[00:04:42]`, nunca `[4:42]` ni `(00:04:42)`). Rangos:
+  `[00:04:42]-[00:05:10]`. Varias marcas para un mismo punto van separadas por
+  coma, cada una con sus propios corchetes. El formato es parseable a propósito
+  —la idea es poder clickear la marca y saltar al segundo en un reproductor—,
+  así que no lo abrevies ni lo adornes.
 - **No atribuyas a personas.** No hay diarización: "en [00:12:30] se plantea
   que…", nunca "Juan dijo que…". Ver `SKILL.md`.
 - **Marca lo inferido.** Si un responsable o un plazo no está dicho de forma

@@ -178,6 +178,11 @@ tramo): decide según la pregunta, el largo del archivo y el contexto disponible
 - **No atribuyas declaraciones a personas.** No hay diarización, así que no se
   sabe quién habla. Cita con timestamp: "en [00:12:30] se plantea que…". Un acta
   sin nombres es mejor que un acta con nombres equivocados.
+
+  **Excepción — Meet, Zoom, Teams:** suelen destacar en pantalla a quien está
+  hablando (nombre al pie, recuadro resaltado). Ahí sí puedes atribuir, extrayendo
+  el frame de ese momento y **citando su ruta** como respaldo. Útil cuando las citas 
+  cargan un compromiso o una decisión.
 - **Formato fijo de timestamp: `[HH:MM:SS]`**, dos dígitos por campo, con las
   horas siempre presentes aunque sean `00` (`[00:04:42]`, nunca `[4:42]` ni
   `(00:04:42)`). Los rangos se escriben como dos marcas unidas por guion:

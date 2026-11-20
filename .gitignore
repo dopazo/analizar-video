@@ -43,3 +43,6 @@ __pycache__/
 *.pyc
 .venv/
 uv.lock
+
+# --- UI del visor ---
+node_modules/

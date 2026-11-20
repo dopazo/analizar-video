@@ -25,6 +25,7 @@ encadenes pasos por tu cuenta.
 | 4 | **Responder / resumir** | Según lo pedido. Resumir o explicar incluye el **sondeo visual** (ver abajo), no es un paso aparte. Al resumir, mencionar que queda un `.md` en `<video>_analisis/` |
 | 5 | **Índice de temas** | En videos largos, donde navegar el transcript se vuelve incómodo |
 | 6 | **Frames de apoyo** | Si la pregunta toca contenido visual, o si un walkthrough gana con capturas |
+| 7 | **Visor** (`visor.py`) | Cuando ya hay transcripción y el usuario quiere revisar la grabación por su cuenta: video con la transcripción sincronizada al lado |
 
 Reglas para que la guía no sea ruido: **una sugerencia a la vez**; no repetir
 una que el usuario ya declinó en la sesión; la primera vez sobre un video se
@@ -87,6 +88,21 @@ uv run scripts/transcribe.py ./sesiones/            # batch secuencial, tolera e
 uv run scripts/extract_frame.py reunion.mp4 --at 00:12:34
 uv run scripts/extract_frame.py reunion.mp4 --at 00:12:34 --range 3 --fps 2   # si no alcanzó
 ```
+
+**Visor** (paso 7): video y transcripción sincronizados en el navegador, con
+resaltado palabra a palabra (si se transcribió con `--words`), colores por
+hablante y búsqueda. Toma la transcripción preferida de la corrida más reciente.
+Es un servidor que queda corriendo: lánzalo **en background** y entrégale al
+usuario la URL que imprime.
+
+```bash
+uv run scripts/visor.py reunion.mp4            # abre el navegador
+uv run scripts/visor.py reunion.mp4 --no-open  # solo imprime la URL
+```
+
+Solo usa la librería estándar y la UI ya compilada en `visor/`. Si el formato no
+se reproduce en el navegador (`.mkv`, `.avi`...), lo remuxea una vez a
+`<video>_analisis/<video>_visor.mp4`.
 
 **Revisar términos después de transcribir** (paso 3):
 

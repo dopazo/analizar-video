@@ -92,6 +92,13 @@ Los `speaker_N` son anónimos. El agente propone a quién corresponde cada uno
 con evidencia (menciones en el texto, el recuadro que Teams/Meet/Zoom destaca en
 el frame) y tú confirmas antes de que aparezca un nombre real.
 
+**Visor: el video con su transcripción al lado.** `visor.py` abre en el
+navegador un reproductor con la transcripción sincronizada: resalta la palabra
+que se está diciendo, colorea por hablante, muestra en una franja bajo el video
+quién habla a lo largo de la reunión y dónde caen los resultados de una
+búsqueda. Clic en cualquier palabra salta a ese momento. Todo local, sin
+instalar nada más: la interfaz viaja compilada dentro de la skill.
+
 **Re-transcribir solo un tramo dudoso.** Cuando una frase queda incomprensible,
 se vuelve a pasar ese pedazo por un modelo mejor con un glosario apuntado.
 Cortar 20 segundos de un archivo de 30 GB toma menos de un segundo.
@@ -306,10 +313,13 @@ analizar-video/                        # el repo
     │   ├── check_env.py
     │   ├── revisar_terminos.py
     │   ├── diarizar.py                # quién habla (Nemotron)
+    │   ├── visor.py                   # servidor local del visor, solo stdlib
     │   ├── _comun.py                  # piezas compartidas, solo stdlib
     │   └── pyproject.toml
+    ├── visor/                         # UI del visor ya compilada (no editar a mano)
     └── references/
         └── formato_contexto.md
+visor-ui/                              # fuente de la UI (React + Vite), fuera de la skill
 ```
 
 ## Créditos

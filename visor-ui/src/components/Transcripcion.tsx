@@ -48,26 +48,41 @@ export function Transcripcion({
     (idx: number, suave = true) => {
       if (idx < 0) return;
       programatico.current = true;
-      // Se desplaza la lista directamente (no con scrollToIndex): el reintento
-      // interno de scrollToIndex vuelve a su destino estimado y pisaría la
-      // corrección de abajo.
-      const destino = virt.getOffsetForIndex(idx, "center")?.[0];
-      if (destino != null) listaRef.current?.scrollTo({ top: destino, behavior: suave ? "smooth" : "auto" });
-      // El virtualizador calcula con altos estimados para las filas que aún no
-      // pintó; cerca del final eso lo deja corto. Cuando la fila ya existe, se
-      // mide de verdad y se corrige lo que falte para centrarla.
       window.clearTimeout(correccion.current);
-      correccion.current = window.setTimeout(() => {
-        const lista = listaRef.current;
-        const fila = lista?.querySelector<HTMLElement>(`[data-index="${idx}"]`);
-        if (lista && fila) {
+      const lista = listaRef.current;
+      if (!lista) return;
+      // El virtualizador calcula con altos estimados para las filas que aún no
+      // pintó: en un salto largo (del inicio al minuto 20) el destino estimado
+      // puede quedar lejos de la fila real, que entonces ni siquiera existe en
+      // el DOM. Se ajusta en pasadas: mientras la fila no esté, se vuelve a
+      // pedir su posición (ya con más filas medidas); cuando está, se mide y se
+      // corrige lo que falte para centrarla, hasta que quede quieta.
+      // Un salto lejano va sin animación: animar 20 minutos de texto no aporta.
+      const destino0 = virt.getOffsetForIndex(idx, "center")?.[0];
+      const lejos = destino0 != null && Math.abs(destino0 - lista.scrollTop) > lista.clientHeight * 3;
+      const anim: ScrollBehavior = suave && !lejos ? "smooth" : "auto";
+      if (destino0 != null) lista.scrollTo({ top: destino0, behavior: anim });
+      let pasada = 0;
+      const ajustar = () => {
+        const fila = lista.querySelector<HTMLElement>(`[data-index="${idx}"]`);
+        let movio = false;
+        if (fila) {
           const a = fila.getBoundingClientRect();
           const b = lista.getBoundingClientRect();
           const delta = a.top + a.height / 2 - (b.top + b.height / 2);
-          if (Math.abs(delta) > 6) lista.scrollTo({ top: lista.scrollTop + delta, behavior: suave ? "smooth" : "auto" });
+          if (Math.abs(delta) > 6) {
+            lista.scrollTo({ top: lista.scrollTop + delta, behavior: pasada === 0 ? anim : "auto" });
+            movio = true;
+          }
+        } else {
+          const d = virt.getOffsetForIndex(idx, "center")?.[0];
+          if (d != null) lista.scrollTo({ top: d, behavior: "auto" });
+          movio = true;
         }
-        window.setTimeout(() => (programatico.current = false), suave ? 450 : 50);
-      }, suave ? 380 : 60);
+        if (movio && ++pasada < 8) correccion.current = window.setTimeout(ajustar, 60);
+        else correccion.current = window.setTimeout(() => (programatico.current = false), anim === "smooth" ? 450 : 50);
+      };
+      correccion.current = window.setTimeout(ajustar, anim === "smooth" ? 380 : 60);
     },
     [virt, listaRef],
   );

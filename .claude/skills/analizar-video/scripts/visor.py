@@ -157,7 +157,58 @@ def leer_documentos(media: Path) -> list[dict]:
             f = candidatos[-1]
             docs.append({"tipo": tipo, "titulo": titulo, "archivo": f.name,
                          "md": f.read_text(encoding="utf-8")})
+    docs.append(doc_notas(media))
     return docs
+
+
+# --- Notas del usuario -------------------------------------------------------
+# Un solo archivo por video, <video>_notas.md, que el usuario va llenando desde
+# el visor (tecla N): cada nota queda anclada al momento del video en que se
+# escribió. Se ordena por ese momento, no por cuándo se escribió, para que se lea
+# como el video. Es markdown simple a propósito: el agente lo lee en sesiones
+# futuras y el usuario lo puede editar a mano.
+
+ENCABEZADO_NOTAS = "# Notas\n\nNotas tomadas en el visor, ancladas al momento del video.\n"
+RE_NOTA = re.compile(r"^- \[(\d{2}:\d{2}:\d{2})\]")
+LOCK_NOTAS = threading.Lock()
+
+
+def archivo_notas(media: Path) -> Path:
+    return carpeta_analisis(media) / f"{media.stem}_notas.md"
+
+
+def doc_notas(media: Path) -> dict:
+    f = archivo_notas(media)
+    md = f.read_text(encoding="utf-8") if f.is_file() else ""
+    return {"tipo": "notas", "titulo": "Notas", "archivo": f.name, "md": md,
+            "cantidad": sum(1 for l in md.splitlines() if RE_NOTA.match(l))}
+
+
+def agregar_nota(media: Path, t: float, texto: str) -> dict:
+    """Inserta la nota en orden de tiempo, conservando lo que ya hubiera en el archivo."""
+    texto = texto.strip().replace("\r\n", "\n")
+    lineas_nota = texto.split("\n")
+    ts = vtt_ts(t)[:8]
+    escrita = time.strftime("%y-%m-%d %H:%M")
+    bloque = [f"- [{ts}] {lineas_nota[0]} · _{escrita}_"] + [f"  {l}" for l in lineas_nota[1:]]
+    f = archivo_notas(media)
+    with LOCK_NOTAS:
+        actual = f.read_text(encoding="utf-8").splitlines() if f.is_file() else ENCABEZADO_NOTAS.splitlines()
+        if not any(RE_NOTA.match(l) for l in actual) and actual and actual[-1].strip():
+            actual.append("")  # una línea en blanco entre el encabezado y la primera nota
+        # Lugar: antes de la primera nota con tiempo mayor; si no hay, al final.
+        pos = len(actual)
+        for i, linea in enumerate(actual):
+            m = RE_NOTA.match(linea)
+            if m and m.group(1) > ts:
+                pos = i
+                break
+        nuevo = actual[:pos] + bloque + actual[pos:]
+        f.parent.mkdir(parents=True, exist_ok=True)
+        tmp = f.with_suffix(".tmp")
+        tmp.write_text("\n".join(nuevo).rstrip("\n") + "\n", encoding="utf-8")
+        tmp.replace(f)
+    return doc_notas(media)
 
 
 def armar_datos(media: Path, url_media: str) -> dict:
@@ -487,6 +538,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         self._servir(cuerpo=True)
 
+    def do_POST(self):
+        # Escrituras: además del Host local, se exige JSON y un Origin local. Un
+        # sitio cualquiera no puede mandar JSON a otro origen sin que el navegador
+        # pida permiso (CORS), y este servidor nunca lo da.
+        origen = self.headers.get("Origin")
+        if (not self._host_ok() or (origen and urlparse(origen).hostname not in {"127.0.0.1", "localhost", "::1"})
+                or not (self.headers.get("Content-Type") or "").startswith("application/json")):
+            return self.send_error(403)
+        if urlparse(self.path).path != "/api/notas":
+            return self.send_error(404)
+        try:
+            largo = min(int(self.headers.get("Content-Length") or 0), 64_000)
+            pedido = json.loads(self.rfile.read(largo) or b"{}")
+            t = float(pedido.get("t", 0))
+            texto = str(pedido.get("texto", ""))
+        except (ValueError, TypeError, json.JSONDecodeError):
+            return self.send_error(400)
+        if not texto.strip():
+            return self.send_error(400)
+        doc = agregar_nota(self.original, max(t, 0.0), texto[:4000])
+        self._enviar(200, "application/json; charset=utf-8",
+                     json.dumps(doc, ensure_ascii=False).encode("utf-8"), True)
+
     def do_HEAD(self):
         self._servir(cuerpo=False)
 
@@ -663,7 +737,8 @@ def main() -> int:
         log("AVISO: no hay transcripcion en "
             f"{carpeta_analisis(media).name}/; el visor mostrara solo el video.")
     for d in datos["documentos"]:
-        log(f"{d['titulo']}: {d['archivo']}")
+        if d["tipo"] != "notas" or d.get("cantidad"):
+            log(f"{d['titulo']}: {d['archivo']}")
     if datos["capitulos"]:
         log(f"Capitulos en la barra: {datos['capitulos']} (del indice)")
 

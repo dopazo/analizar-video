@@ -102,7 +102,10 @@ búsqueda. Clic en cualquier palabra salta a ese momento. Si ya hay resumen o
 timestamp que contienen es un enlace a ese momento del video. Los capítulos
 del índice también parten la barra de tiempo, y al pasar el mouse se ve el
 título del capítulo con una miniatura del video, como en YouTube. Con `C` la
-transcripción aparece como subtítulos, también en pantalla completa. El panel
+transcripción aparece como subtítulos, también en pantalla completa. Con `N`
+anotas algo en el momento actual del video: queda en `<video>_notas.md` y en una
+pestaña Notas, y el agente las lee cuando vuelves a trabajar sobre ese video.
+`Ctrl+F` busca en lo que se dijo. El panel
 de texto tiene su propia pantalla completa para leer el resumen con renglones
 largos, con una barra flotante para seguir controlando el video. Un botón de
 recargar trae el resumen, índice o hablantes que se hayan escrito con el visor

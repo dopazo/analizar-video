@@ -43,15 +43,66 @@ export function Transcripcion({
     return m;
   }, [coincidencias, actual]);
 
+  const correccion = useRef(0);
   const irA = useCallback(
-    (idx: number) => {
+    (idx: number, suave = true) => {
       if (idx < 0) return;
       programatico.current = true;
-      virt.scrollToIndex(idx, { align: "center", behavior: "smooth" });
-      window.setTimeout(() => (programatico.current = false), 600);
+      // Se desplaza la lista directamente (no con scrollToIndex): el reintento
+      // interno de scrollToIndex vuelve a su destino estimado y pisaría la
+      // corrección de abajo.
+      const destino = virt.getOffsetForIndex(idx, "center")?.[0];
+      if (destino != null) listaRef.current?.scrollTo({ top: destino, behavior: suave ? "smooth" : "auto" });
+      // El virtualizador calcula con altos estimados para las filas que aún no
+      // pintó; cerca del final eso lo deja corto. Cuando la fila ya existe, se
+      // mide de verdad y se corrige lo que falte para centrarla.
+      window.clearTimeout(correccion.current);
+      correccion.current = window.setTimeout(() => {
+        const lista = listaRef.current;
+        const fila = lista?.querySelector<HTMLElement>(`[data-index="${idx}"]`);
+        if (lista && fila) {
+          const a = fila.getBoundingClientRect();
+          const b = lista.getBoundingClientRect();
+          const delta = a.top + a.height / 2 - (b.top + b.height / 2);
+          if (Math.abs(delta) > 6) lista.scrollTo({ top: lista.scrollTop + delta, behavior: suave ? "smooth" : "auto" });
+        }
+        window.setTimeout(() => (programatico.current = false), suave ? 450 : 50);
+      }, suave ? 380 : 60);
     },
-    [virt],
+    [virt, listaRef],
   );
+
+  // Si cambia el ancho de la lista (pantalla completa del panel, ventana más
+  // angosta), los renglones cambian de alto y las medidas quedan viejas: se
+  // re-mide y se vuelve a centrar lo que suena, sin animación (un scroll suave
+  // calculado con medidas viejas termina en otro lado).
+  const seguirRef = useRef({ siguiendo, lineaActiva });
+  seguirRef.current = { siguiendo, lineaActiva };
+  useEffect(() => {
+    const el = listaRef.current;
+    if (!el) return;
+    let ancho = el.clientWidth;
+    let timers: number[] = [];
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth === ancho) return;
+      ancho = el.clientWidth;
+      timers.forEach(window.clearTimeout);
+      virt.measure();
+      // Los altos reales llegan de a poco (cada fila se mide al pintarse): se
+      // corrige en varias pasadas cortas hasta que la posición se asienta.
+      timers = [0, 80, 200, 400, 700].map((ms) =>
+        window.setTimeout(() => {
+          const { siguiendo: s, lineaActiva: l } = seguirRef.current;
+          if (s && l >= 0) irA(l, false);
+        }, ms),
+      );
+    });
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      timers.forEach(window.clearTimeout);
+    };
+  }, [listaRef, virt, irA]);
 
   // Seguir al video mientras el usuario no se haya ido a leer otra parte.
   useEffect(() => {

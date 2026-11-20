@@ -15,8 +15,13 @@ npm install
 npm run dev          # Vite en http://localhost:5173
 
 # en otra terminal, el servidor de datos y video:
-uv run ../.claude/skills/analizar-video/scripts/visor.py ruta/al/video.mp4 --no-open
+uv run ../.claude/skills/analizar-video/scripts/visor.py ruta/al/video.mp4 --no-open --mantener
 ```
+
+`--mantener` evita que el servidor se cierre solo mientras recargas o reinicias
+Vite. Sin esa opción, el servidor termina unos 12 s después de que se cierra la
+última pestaña: cada pestaña mantiene abierta una conexión SSE a `/api/vivo`, y
+el servidor se da cuenta cuando se corta.
 
 Vite reenvía `/api` y `/media` al servidor Python (puerto 4810; otro con
 `VISOR_PY=http://127.0.0.1:<puerto>`).

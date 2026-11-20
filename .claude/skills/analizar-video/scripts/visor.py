@@ -9,6 +9,10 @@ _corregido > crudo) y, si existe, el _palabras.jsonl de esa corrida para
 resaltar palabra a palabra. El resumen y el índice más recientes, si existen,
 aparecen como pestañas; sus [HH:MM:SS] llevan a ese momento del video.
 
+Se cierra solo: vive mientras haya una pestaña del visor abierta y termina
+~12 s después de cerrar la última (una recarga no lo cierra). Si nadie abre la
+URL en 10 minutos, también termina. --mantener lo desactiva.
+
 Solo stdlib. Sirve la UI ya compilada (carpeta visor/ de la skill), el video
 con soporte de Range (sin eso el navegador no puede adelantar) y los datos en
 /api/datos. Escucha solo en 127.0.0.1.
@@ -24,12 +28,14 @@ import argparse
 import http.server
 import json
 import mimetypes
+import os
 import re
 import shutil
 import socketserver
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -200,6 +206,60 @@ def preparar_media(media: Path) -> Path:
 
 # --- Servidor --------------------------------------------------------------
 
+# --- Autocierre ---------------------------------------------------------------
+# El servidor vive mientras haya una pestaña del visor abierta. Cada pestaña
+# mantiene abierta una conexión SSE (/api/vivo); al cerrarla, el navegador la
+# corta y el servidor lo nota en el siguiente latido. Así no quedan servidores
+# huérfanos corriendo por detrás cuando el usuario solo cierra la ventana.
+
+LATIDO = 3            # s entre latidos por la conexión SSE
+GRACIA = 12           # s sin pestañas antes de cerrar (una recarga no lo cierra)
+ESPERA_INICIAL = 600  # s para que alguien abra la URL antes de rendirse
+
+
+class Presencia:
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.pestanas = 0
+        self.alguna_vez = False
+        self.desde = time.monotonic()  # desde cuándo está en 0 pestañas
+
+    def entra(self) -> None:
+        with self.lock:
+            self.pestanas += 1
+            self.alguna_vez = True
+
+    def sale(self) -> None:
+        with self.lock:
+            self.pestanas -= 1
+            if self.pestanas == 0:
+                self.desde = time.monotonic()
+
+    def motivo_para_cerrar(self) -> str | None:
+        with self.lock:
+            if self.pestanas > 0:
+                return None
+            quieto = time.monotonic() - self.desde
+            if self.alguna_vez and quieto > GRACIA:
+                return "se cerro la ventana del visor"
+            if not self.alguna_vez and quieto > ESPERA_INICIAL:
+                return f"nadie abrio el visor en {ESPERA_INICIAL // 60} minutos"
+            return None
+
+
+PRESENCIA = Presencia()
+
+
+def vigilar(srv: "Servidor") -> None:
+    while True:
+        time.sleep(1)
+        motivo = PRESENCIA.motivo_para_cerrar()
+        if motivo:
+            print(f"Visor cerrado: {motivo}.", flush=True)
+            srv.shutdown()  # desde otro hilo: serve_forever() vuelve y main() termina
+            return
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     media: Path      # lo que se sirve (puede ser el remux)
     original: Path   # el video que pidió el usuario: de ahí salen los datos
@@ -231,9 +291,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._enviar(200, "application/json; charset=utf-8", data, cuerpo)
         if ruta == "/media":
             return self._servir_media(cuerpo)
+        if ruta == "/api/vivo":
+            return self._vivo()
         if ruta == "/analisis":
             return self._servir_imagen(parse_qs(url.query).get("ruta", [""])[0], cuerpo)
         return self._servir_ui(ruta, cuerpo)
+
+    def _vivo(self):
+        """Conexión SSE que dura lo que dura la pestaña: es la señal de presencia."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+        PRESENCIA.entra()
+        try:
+            while True:
+                self.wfile.write(b"event: latido\ndata: {}\n\n")
+                self.wfile.flush()
+                time.sleep(LATIDO)
+        except OSError:  # BrokenPipe / ConnectionReset / ConnectionAborted (Windows)
+            pass
+        finally:
+            PRESENCIA.sale()
 
     def _servir_imagen(self, pedida: str, cuerpo: bool):
         """Frames que un resumen referencia. Solo imágenes dentro de <video>_analisis/."""
@@ -321,7 +401,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 class Servidor(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
-    allow_reuse_address = True
+    # En Windows SO_REUSEADDR deja a dos procesos escuchar el mismo puerto: el
+    # segundo visor "robaría" conexiones al primero. Ahí se desactiva.
+    allow_reuse_address = os.name != "nt"
 
 
 def main() -> int:
@@ -330,6 +412,8 @@ def main() -> int:
     ap.add_argument("input", help="Video o audio")
     ap.add_argument("--port", type=int, default=4810)
     ap.add_argument("--no-open", action="store_true", help="No abrir el navegador")
+    ap.add_argument("--mantener", action="store_true",
+                    help="No cerrarse solo al cerrar la ventana (para desarrollar la UI)")
     args = ap.parse_args()
 
     media = Path(args.input).resolve()
@@ -361,7 +445,11 @@ def main() -> int:
         log(f"No hay puerto libre entre {args.port} y {args.port + 19}")
         return 1
     url = f"http://127.0.0.1:{srv.server_address[1]}/"
-    print(f"Visor en {url}  (Ctrl+C para cerrar)", flush=True)
+    if args.mantener:
+        print(f"Visor en {url}  (Ctrl+C para cerrar)", flush=True)
+    else:
+        print(f"Visor en {url}  (se cierra solo al cerrar la ventana)", flush=True)
+        threading.Thread(target=vigilar, args=(srv,), daemon=True).start()
     if not args.no_open:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     try:

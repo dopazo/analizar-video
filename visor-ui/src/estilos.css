@@ -457,6 +457,12 @@ kbd {
 .documento tr.bloque-actual { box-shadow: none; border-radius: 0; }
 .documento tr.bloque-actual td { color: var(--texto); }
 
+.aviso-cerrado {
+  margin: 14px 20px 0; padding: 10px 14px; border-radius: 10px; font-size: 13px;
+  color: var(--texto-2); background: var(--panel); border: 1px solid var(--borde-fuerte);
+}
+.aviso-cerrado + .cabecera { margin-top: 10px; }
+
 :focus-visible { outline: 2px solid var(--borde-fuerte); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {

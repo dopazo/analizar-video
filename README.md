@@ -99,7 +99,9 @@ quién habla a lo largo de la reunión y dónde caen los resultados de una
 búsqueda. Clic en cualquier palabra salta a ese momento. Si ya hay resumen o
 índice de temas, aparecen en pestañas al lado de la transcripción y cada
 timestamp que contienen es un enlace a ese momento del video. El agente lo
-ofrece al final, cuando ya está todo escrito. Todo local, sin instalar nada más:
+ofrece al final, cuando ya está todo escrito, y el servidor se apaga solo al
+cerrar la ventana: no quedan procesos corriendo por detrás. Todo local, sin
+instalar nada más:
 la interfaz viaja compilada dentro de la skill.
 
 **Re-transcribir solo un tramo dudoso.** Cuando una frase queda incomprensible,

@@ -100,9 +100,13 @@ final, cuando ya está todo escrito:
 > ¿Quieres abrirlo en el visor? Video y transcripción sincronizados, con el
 > resumen y el índice en pestañas.
 
-Es un servidor que queda corriendo: lánzalo **en background** y entrégale al
-usuario la URL que imprime. Si después escribes un resumen o índice nuevo, basta
-con que el usuario recargue la página.
+Lánzalo **en background** y entrégale al usuario la URL que imprime. **Se
+cierra solo**: el servidor vive mientras haya una pestaña del visor abierta y
+termina unos segundos después de que el usuario cierra la última (una recarga
+no lo cierra); si nadie abre la URL en 10 minutos, también termina. No hace
+falta matarlo ni pedirle al usuario que lo haga. Si el usuario quiere volver a
+verlo después, se lanza de nuevo. Si escribes un resumen o índice nuevo con el
+visor abierto, basta con que el usuario recargue la página.
 
 ```bash
 uv run scripts/visor.py reunion.mp4            # abre el navegador

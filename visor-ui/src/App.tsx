@@ -17,6 +17,7 @@ export default function App() {
   const [visitado, setVisitado] = useState(false);
   const [pedirSeguir, setPedirSeguir] = useState(0);
   const [pestana, setPestana] = useState<string>("transcripcion");
+  const conectado = usePresencia();
   const mediaRef = useRef<HTMLVideoElement>(null);
   const listaRef = useRef<HTMLDivElement>(null);
   const buscador = useRef<HTMLInputElement>(null);
@@ -141,6 +142,11 @@ export default function App() {
   return (
     <div className="app">
       <div className="fondo" aria-hidden />
+      {!conectado && (
+        <div className="aviso-cerrado" role="status">
+          El visor se cerró en el equipo. Lo que ya cargó sigue a la vista; para volver a usarlo, pídele al agente que lo abra de nuevo.
+        </div>
+      )}
       <header className="cabecera">
         <Marca />
         <div className="titulo">
@@ -279,4 +285,36 @@ function Esqueleto() {
       </main>
     </div>
   );
+}
+
+/**
+ * Mantiene abierta la conexión /api/vivo: mientras exista, el servidor sabe que
+ * hay una pestaña abierta; al cerrarla, se apaga solo. Si el servidor ya no
+ * está (se cerró o el equipo durmió), devuelve false para avisarlo.
+ */
+function usePresencia(): boolean {
+  const [conectado, setConectado] = useState(true);
+  useEffect(() => {
+    const es = new EventSource("api/vivo");
+    let timer = 0;
+    es.onopen = () => {
+      window.clearTimeout(timer);
+      timer = 0;
+      setConectado(true);
+    };
+    es.onerror = () => {
+      // EventSource reintenta solo (cada ~3 s); si en 4 s no volvió, avisamos.
+      // El temporizador no se reinicia en cada reintento fallido.
+      if (timer) return;
+      timer = window.setTimeout(() => {
+        timer = 0;
+        if (es.readyState !== EventSource.OPEN) setConectado(false);
+      }, 4000);
+    };
+    return () => {
+      window.clearTimeout(timer);
+      es.close();
+    };
+  }, []);
+  return conectado;
 }

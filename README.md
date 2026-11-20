@@ -21,14 +21,19 @@ Code en todos tus proyectos.
 **Windows (PowerShell)**
 
 ```powershell
-New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null; Set-Location "$HOME\.claude\skills"
-curl.exe -sLo analizar-video.tar.gz https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz
-tar -xzf analizar-video.tar.gz --strip-components=3 analizar-video-main/.claude/skills/analizar-video; Remove-Item analizar-video.tar.gz
+$destino = "$HOME\.claude\skills"
+$ProgressPreference = "SilentlyContinue"
+$zip = "$env:TEMP\analizar-video.zip"; $tmp = "$env:TEMP\analizar-video"
+Invoke-WebRequest https://github.com/dopazo/analizar-video/archive/refs/heads/main.zip -OutFile $zip
+Expand-Archive $zip $tmp -Force
+New-Item -ItemType Directory -Force $destino | Out-Null
+Copy-Item "$tmp\analizar-video-main\.claude\skills\analizar-video" $destino -Recurse -Force
+Remove-Item $zip, $tmp -Recurse -Force
 ```
 
-Es `curl.exe` y no `curl` (en PowerShell, `curl` a secas es otro comando), y
-baja a un archivo en vez de usar `|`, porque PowerShell 5 altera los datos
-binarios que pasan por un pipe. `curl.exe` y `tar` vienen con Windows 10 y 11.
+Usa solo comandos propios de PowerShell (sin `tar` ni `curl`), así no importa
+qué otras herramientas tengas en el PATH. Para instalarla en un solo proyecto,
+cambia la primera línea por `$destino = "C:\ruta\a\tu-proyecto\.claude\skills"`.
 
 **macOS y Linux (Terminal)**
 
@@ -39,8 +44,8 @@ curl -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz
 
 En cualquiera de los dos queda una carpeta `analizar-video/` con `SKILL.md`
 adentro. **Para actualizar**, borra esa carpeta y repite el comando. Para usarla
-en un solo proyecto, haz lo mismo dentro de `<tu-proyecto>/.claude/skills/` en
-vez de `~/.claude/skills/`.
+en un solo proyecto, usa `<tu-proyecto>/.claude/skills/` en vez de
+`~/.claude/skills/`.
 
 Después instala lo que pide: [uv](https://docs.astral.sh/uv/) y `ffmpeg` (git
 solo si vas a diarizar). El detalle por sistema, y sin permisos de

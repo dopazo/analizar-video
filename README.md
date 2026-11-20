@@ -14,18 +14,37 @@ instrucciones le enseña al agente cuándo y cómo usarlos.
 
 ## Instalar
 
-Párate en la carpeta donde quieras la skill —`~/.claude/skills/` para tenerla en
-todos tus proyectos— y descárgala sin clonar el repo:
+Descarga la skill sin clonar el repo. Los comandos cambian según el sistema:
+elige el bloque del tuyo. Lo deja en `~/.claude/skills/analizar-video/`, disponible para Claude
+Code en todos tus proyectos.
+
+**Windows (PowerShell)**
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null; Set-Location "$HOME\.claude\skills"
+curl.exe -sLo analizar-video.tar.gz https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz
+tar -xzf analizar-video.tar.gz --strip-components=3 analizar-video-main/.claude/skills/analizar-video; Remove-Item analizar-video.tar.gz
+```
+
+Es `curl.exe` y no `curl` (en PowerShell, `curl` a secas es otro comando), y
+baja a un archivo en vez de usar `|`, porque PowerShell 5 altera los datos
+binarios que pasan por un pipe. `curl.exe` y `tar` vienen con Windows 10 y 11.
+
+**macOS y Linux (Terminal)**
 
 ```bash
+mkdir -p ~/.claude/skills && cd ~/.claude/skills
 curl -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz | tar -xz --strip-components=3 analizar-video-main/.claude/skills/analizar-video
 ```
 
-En PowerShell es el mismo comando, con `curl.exe` en vez de `curl` (`curl` a
-secas es un alias de `Invoke-WebRequest` y rompe el pipe).
+En cualquiera de los dos queda una carpeta `analizar-video/` con `SKILL.md`
+adentro. **Para actualizar**, borra esa carpeta y repite el comando. Para usarla
+en un solo proyecto, haz lo mismo dentro de `<tu-proyecto>/.claude/skills/` en
+vez de `~/.claude/skills/`.
 
-Requiere [uv](https://docs.astral.sh/uv/) y `ffmpeg`; el detalle está en
-[Requisitos](#requisitos).
+Después instala lo que pide: [uv](https://docs.astral.sh/uv/) y `ffmpeg` (git
+solo si vas a diarizar). El detalle por sistema, y sin permisos de
+administrador, está en [Requisitos](#requisitos).
 
 ## Qué puedes pedirle
 
@@ -230,6 +249,17 @@ libre.
 - **Navegador** para el visor: cualquiera sirve. Para que abra en una ventana
   propia, sin pestañas, uno basado en Chromium (Edge, Chrome o Brave; en
   Windows, Edge ya viene instalado). Sin ninguno, abre una pestaña normal.
+
+**Cómo instalarlos**, según el sistema:
+
+| | Windows (PowerShell) | macOS | Linux (Debian/Ubuntu) |
+|---|---|---|---|
+| uv | `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 \| iex"` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| ffmpeg | `winget install --id Gyan.FFmpeg -e` | `brew install ffmpeg` | `sudo apt install ffmpeg` |
+| git (solo para diarizar) | `winget install --id Git.Git -e` | `xcode-select --install` | `sudo apt install git` |
+
+El instalador de uv no pide permisos de administrador. `winget` a veces sí:
+si no los tienes, mira la alternativa más abajo.
 
 **No hace falta:**
 - **Node.js**: el visor viaja ya compilado dentro de la skill. Solo se usa para

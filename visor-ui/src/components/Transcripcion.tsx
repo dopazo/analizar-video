@@ -15,10 +15,12 @@ interface Props {
   /** se incrementa para pedir "vuelve a seguir al video" desde afuera (tecla .) */
   pedirSeguir: number;
   pestanas: ReactNode;
+  /** botones a la derecha de la cabecera (pantalla completa del panel) */
+  acciones?: ReactNode;
 }
 
 export function Transcripcion({
-  lineas, hablantes, lineaActiva, coincidencias, actual, listaRef, onSaltar, pedirSeguir, pestanas,
+  lineas, hablantes, lineaActiva, coincidencias, actual, listaRef, onSaltar, pedirSeguir, pestanas, acciones,
 }: Props) {
   const [siguiendo, setSiguiendo] = useState(true);
   const programatico = useRef(false);
@@ -78,7 +80,7 @@ export function Transcripcion({
   if (!lineas.length) {
     return (
       <div className="transcripcion">
-        <div className="panel-cabecera">{pestanas}</div>
+        <div className="panel-cabecera">{pestanas}{acciones}</div>
         <div className="vacia">
           <p>No hay transcripción para este video.</p>
           <p className="tenue">Pídele al agente que lo transcriba y recarga esta página.</p>
@@ -92,10 +94,13 @@ export function Transcripcion({
     <div className="transcripcion">
       <div className="panel-cabecera">
         {pestanas}
-        <span className={`estado-seguir${siguiendo && !coincidencias.length ? " on" : ""}`}>
-          <i />
-          {coincidencias.length ? `${coincidencias.length} resultados` : siguiendo ? "Siguiendo el video" : "Lectura libre"}
-        </span>
+        <div className="cabecera-derecha">
+          <span className={`estado-seguir${siguiendo && !coincidencias.length ? " on" : ""}`}>
+            <i />
+            {coincidencias.length ? `${coincidencias.length} resultados` : siguiendo ? "Siguiendo el video" : "Lectura libre"}
+          </span>
+          {acciones}
+        </div>
       </div>
       <div
         className="lista"

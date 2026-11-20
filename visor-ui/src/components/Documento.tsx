@@ -65,9 +65,11 @@ interface Props {
   mediaRef: RefObject<HTMLMediaElement | null>;
   onSaltar: (t: number) => void;
   pestanas: ReactNode;
+  /** botones a la derecha de la cabecera (pantalla completa del panel) */
+  acciones?: ReactNode;
 }
 
-export function Documento({ doc, mediaRef, onSaltar, pestanas }: Props) {
+export function Documento({ doc, mediaRef, onSaltar, pestanas, acciones }: Props) {
   const html = useMemo(() => marked.parse(doc.md, { async: false }) as string, [doc.md]);
   const cont = useRef<HTMLDivElement>(null);
 
@@ -111,7 +113,10 @@ export function Documento({ doc, mediaRef, onSaltar, pestanas }: Props) {
     <div className="transcripcion">
       <div className="panel-cabecera">
         {pestanas}
-        <span className="archivo-doc" title={doc.archivo}>{doc.archivo}</span>
+        <div className="cabecera-derecha">
+          <span className="archivo-doc" title={doc.archivo}>{doc.archivo}</span>
+          {acciones}
+        </div>
       </div>
       <div
         ref={cont}

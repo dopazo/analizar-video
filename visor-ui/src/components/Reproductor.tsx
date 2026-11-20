@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useAmbiente } from "../lib/ambiente";
+import { Subtitulos } from "./Subtitulos";
 import {
   MediaController,
   MediaControlBar,
@@ -14,6 +15,7 @@ import {
   MediaPlaybackRateButton,
   MediaFullscreenButton,
   MediaPipButton,
+  MediaCaptionsButton,
   MediaLoadingIndicator,
 } from "media-chrome/react";
 
@@ -26,6 +28,19 @@ interface Props {
   bajoSlider?: ReactNode;
   capitulos: number;
   miniaturas: boolean;
+  /** subtítulos (WebVTT) armados desde la transcripción; se prenden con "c" */
+  subtitulos: string | null;
+  /** cambia al recargar los datos: obliga a releer la pista de capítulos */
+  version: number;
+}
+
+/** La pista de subtítulos se sirve como blob: se arma en el navegador. */
+function useUrlTexto(texto: string | null, tipo: string): string | null {
+  const url = useMemo(() => (texto ? URL.createObjectURL(new Blob([texto], { type: tipo })) : null), [texto, tipo]);
+  useEffect(() => () => {
+    if (url) URL.revokeObjectURL(url);
+  }, [url]);
+  return url;
 }
 
 /**
@@ -52,7 +67,7 @@ function useMiniaturas(inicial: boolean, activo: boolean): boolean {
 const ID = "reproductor";
 // Los controles que viven fuera de <media-controller> se enlazan por id.
 // El atributo no está en los tipos del wrapper de React, de ahí el spread.
-const enlace = { mediacontroller: ID } as Record<string, string>;
+export const enlace = { mediacontroller: ID } as Record<string, string>;
 
 function Botones({ audio, externo }: { audio: boolean; externo: boolean }) {
   const e = externo ? enlace : {};
@@ -68,14 +83,20 @@ function Botones({ audio, externo }: { audio: boolean; externo: boolean }) {
       <MediaPlaybackRateButton rates={[1, 1.25, 1.5, 1.75, 2]} {...e} />
       <MediaMuteButton {...e} />
       <MediaVolumeRange {...e} />
+      {/* Sin enlace propio: la barra que lo contiene ya está enlazada al
+          reproductor, y un interruptor enlazado dos veces recibe el clic dos
+          veces (prende y apaga). Play o mute no lo notan: piden un estado, no
+          lo alternan. */}
+      {!audio && <MediaCaptionsButton />}
       {!audio && <MediaPipButton {...e} />}
       {!audio && <MediaFullscreenButton {...e} />}
     </>
   );
 }
 
-export function Reproductor({ url, nombre, audio, mediaRef, bajoSlider, capitulos, miniaturas }: Props) {
+export function Reproductor({ url, nombre, audio, mediaRef, bajoSlider, capitulos, miniaturas, subtitulos, version }: Props) {
   const lienzo = useRef<HTMLCanvasElement>(null);
+  const urlSubtitulos = useUrlTexto(audio ? null : subtitulos, "text/vtt");
   const miniListas = useMiniaturas(miniaturas, !audio);
   useAmbiente(mediaRef, lienzo, !audio);
   return (
@@ -95,11 +116,15 @@ export function Reproductor({ url, nombre, audio, mediaRef, bajoSlider, capitulo
           <video slot="media" src={url} preload="auto" playsInline ref={mediaRef}>
             {/* Capítulos del índice: Media Chrome parte la barra en tramos y
                 muestra el título del tramo al pasar el mouse, como YouTube. */}
-            {capitulos > 0 && <track kind="chapters" src="api/capitulos.vtt" srcLang="es" default />}
+            {capitulos > 0 && <track key={version} kind="chapters" src={`api/capitulos.vtt?v=${version}`} srcLang="es" default />}
             {miniListas && <track kind="metadata" label="thumbnails" src="api/miniaturas.vtt" default />}
+            {/* Apagados al inicio; "c" o el botón CC los prenden (también en pantalla completa). */}
+            {urlSubtitulos && <track kind="captions" label="Transcripción" srcLang="es" src={urlSubtitulos} />}
           </video>
         )}
         {!audio && <MediaLoadingIndicator slot="centered-chrome" noAutohide />}
+        {/* En la columna inferior, antes de la barra: siempre queda encima de ella. */}
+        {!audio && <Subtitulos mediaRef={mediaRef} />}
         {/* Solo en pantalla completa: ahí los controles de abajo no se ven. */}
         {!audio && (
           <MediaControlBar className="barra-pantalla-completa">
@@ -109,6 +134,7 @@ export function Reproductor({ url, nombre, audio, mediaRef, bajoSlider, capitulo
             <MediaDurationDisplay />
             <MediaPlaybackRateButton rates={[1, 1.25, 1.5, 1.75, 2]} />
             <MediaMuteButton />
+            <MediaCaptionsButton />
             <MediaFullscreenButton />
           </MediaControlBar>
         )}

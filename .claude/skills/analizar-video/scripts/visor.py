@@ -4,8 +4,14 @@
 # ///
 """Visor local: el video con su transcripción sincronizada, en el navegador.
 
-    uv run scripts/visor.py reunion.mp4            # abre el navegador
-    uv run scripts/visor.py reunion.mp4 --no-open  # solo imprime la URL
+    uv run scripts/visor.py reunion.mp4              # ventana propia (modo app)
+    uv run scripts/visor.py reunion.mp4 --navegador  # pestaña del navegador
+    uv run scripts/visor.py reunion.mp4 --no-open    # solo imprime la URL
+
+Por defecto se abre en una ventana propia, sin pestañas ni barra de direcciones:
+el modo app (--app=URL) de un navegador Chromium (Edge, Chrome, Brave,
+Chromium). Usa el predeterminado si es Chromium; si no, el primero que
+encuentre. Sin ninguno, cae a una pestaña normal.
 
 Toma la transcripción más reciente de <video>_analisis/ (con la misma
 preferencia que el resto de la skill: _hablantes_corregido > _hablantes >
@@ -334,6 +340,80 @@ def preparar_media(media: Path) -> Path:
     return destino
 
 
+# --- Ventana ---------------------------------------------------------------
+# El modo app de Chromium abre la URL en una ventana propia que se ve como una
+# aplicación. No hay nada que instalar: Edge viene con Windows 10/11.
+
+CHROMIUM_WIN = [  # relativo a Program Files / LocalAppData
+    "Microsoft/Edge/Application/msedge.exe",
+    "Google/Chrome/Application/chrome.exe",
+    "BraveSoftware/Brave-Browser/Application/brave.exe",
+    "Chromium/Application/chrome.exe",
+]
+CHROMIUM_MAC = ["Google Chrome", "Microsoft Edge", "Brave Browser", "Chromium"]
+CHROMIUM_LINUX = ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser",
+                  "microsoft-edge", "microsoft-edge-stable", "brave-browser"]
+NOMBRES_CHROMIUM = {"msedge.exe", "chrome.exe", "brave.exe", "chromium.exe"}
+TAMANO_VENTANA = "--window-size=1440,900"
+
+
+def _predeterminado_windows() -> str | None:
+    """Ejecutable del navegador predeterminado en Windows, si se puede leer."""
+    try:
+        import winreg
+        clave = r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, clave) as k:
+            progid = winreg.QueryValueEx(k, "ProgId")[0]
+        with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, rf"{progid}\shell\open\command") as k:
+            comando = winreg.QueryValueEx(k, "")[0]
+    except OSError:
+        return None
+    m = re.match(r'\s*"([^"]+)"|\s*(\S+)', comando)
+    return (m.group(1) or m.group(2)) if m else None
+
+
+def comando_app(url: str) -> list[str] | None:
+    """Comando para abrir la URL en modo app, o None si no hay Chromium."""
+    app = f"--app={url}"
+    if os.name == "nt":
+        pred = _predeterminado_windows()
+        candidatos = [pred] if pred and Path(pred).name.lower() in NOMBRES_CHROMIUM else []
+        bases = [os.environ.get(v) for v in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA")]
+        candidatos += [str(Path(b) / rel) for rel in CHROMIUM_WIN for b in bases if b]
+        exe = next((c for c in candidatos if Path(c).is_file()), None)
+        return [exe, app, TAMANO_VENTANA] if exe else None
+    if sys.platform == "darwin":
+        for nombre in CHROMIUM_MAC:
+            ruta = Path("/Applications") / f"{nombre}.app"
+            if ruta.is_dir():
+                return ["open", "-na", str(ruta), "--args", app, TAMANO_VENTANA]
+        return None
+    exe = next((shutil.which(n) for n in CHROMIUM_LINUX if shutil.which(n)), None)
+    return [exe, app, TAMANO_VENTANA] if exe else None
+
+
+def abrir(url: str, en_navegador: bool) -> None:
+    """Ventana propia (modo app) o, si se pide o no hay Chromium, una pestaña."""
+    if not en_navegador:
+        cmd = comando_app(url)
+        if cmd:
+            try:
+                extra = {}
+                if os.name == "nt":  # que el navegador no quede atado a esta consola
+                    extra["creationflags"] = (subprocess.DETACHED_PROCESS
+                                              | subprocess.CREATE_NEW_PROCESS_GROUP)
+                subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL, close_fds=True, **extra)
+                nombre = Path(cmd[2] if cmd[0] == "open" else cmd[0]).stem
+                log(f"Abierto en ventana propia ({nombre}).")
+                return
+            except OSError as e:
+                log(f"No se pudo abrir en ventana propia ({e}); se usa una pestaña.")
+        else:
+            log("No hay navegador Chromium para la ventana propia; se usa una pestaña.")
+    webbrowser.open(url)
+
+
 # --- Servidor --------------------------------------------------------------
 
 # --- Autocierre ---------------------------------------------------------------
@@ -555,7 +635,10 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("input", help="Video o audio")
     ap.add_argument("--port", type=int, default=4810)
-    ap.add_argument("--no-open", action="store_true", help="No abrir el navegador")
+    ap.add_argument("--no-open", action="store_true", help="No abrir nada: solo imprime la URL")
+    ap.add_argument("--navegador", action="store_true",
+                    help="Abrir en una pestaña del navegador predeterminado en vez de "
+                         "una ventana propia")
     ap.add_argument("--mantener", action="store_true",
                     help="No cerrarse solo al cerrar la ventana (para desarrollar la UI)")
     args = ap.parse_args()
@@ -601,7 +684,7 @@ def main() -> int:
         print(f"Visor en {url}  (se cierra solo al cerrar la ventana)", flush=True)
         threading.Thread(target=vigilar, args=(srv,), daemon=True).start()
     if not args.no_open:
-        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+        threading.Timer(0.5, abrir, args=(url, args.navegador)).start()
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

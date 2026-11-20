@@ -3,6 +3,8 @@ import type { Datos } from "./tipos";
 import { buscar, prepararLineas } from "./lib/util";
 import { useSincronia } from "./lib/sincronia";
 import { Reproductor } from "./components/Reproductor";
+import { BarraFlotante, BotonPanelCompleto, usePanelCompleto } from "./components/PanelCompleto";
+import { subtitulosVTT } from "./lib/subtitulos";
 import { Leyenda, MapaTiempo } from "./components/MapaTiempo";
 import { Transcripcion } from "./components/Transcripcion";
 import { Documento } from "./components/Documento";
@@ -21,18 +23,33 @@ export default function App() {
   const mediaRef = useRef<HTMLVideoElement>(null);
   const listaRef = useRef<HTMLDivElement>(null);
   const buscador = useRef<HTMLInputElement>(null);
+  const columnaTexto = useRef<HTMLElement>(null);
+  const [panelCompleto, alternarPanel] = usePanelCompleto(columnaTexto);
 
-  useEffect(() => {
-    fetch("api/datos")
+  // Recargar vuelve a pedir los datos sin recargar la página: si se abrió el
+  // visor antes de tener resumen, índice o hablantes, aparecen sin perder el
+  // punto del video. `version` fuerza a releer las pistas (capítulos).
+  const [version, setVersion] = useState(0);
+  const [cargando, setCargando] = useState(false);
+  const cargar = useCallback(() => {
+    setCargando(true);
+    fetch("api/datos", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((d: Datos) => {
         setDatos(d);
+        setVersion((v) => v + 1);
         document.title = d.video.nombre;
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(String(e)))
+      .finally(() => setCargando(false));
   }, []);
+  useEffect(cargar, [cargar]);
 
   const lineas = useMemo(() => (datos ? prepararLineas(datos) : []), [datos]);
+  const subtitulos = useMemo(
+    () => (datos && lineas.length ? subtitulosVTT(lineas, datos.hablantes) : null),
+    [datos, lineas],
+  );
   const consultaDiferida = useDeferredValue(consulta);
   const coincidencias = useMemo(() => buscar(lineas, consultaDiferida), [lineas, consultaDiferida]);
   useEffect(() => {
@@ -87,6 +104,10 @@ export default function App() {
       }
       if (enCampo || !el || e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
+      // Con el foco dentro del reproductor, Media Chrome ya atiende estas teclas:
+      // atenderlas también acá las aplicaría dos veces (play y pausa a la vez).
+      const propiasDelReproductor = [" ", "k", "m", "f", "c", "arrowleft", "arrowright", "arrowup", "arrowdown"];
+      if ((e.target as HTMLElement)?.closest("media-controller") && propiasDelReproductor.includes(k)) return;
       if (k === " " || k === "k") {
         e.preventDefault();
         if (el.paused) void el.play();
@@ -101,6 +122,10 @@ export default function App() {
         setPedirSeguir((n) => n + 1);
       } else if (k === "m") {
         el.muted = !el.muted;
+      } else if (k === "c") {
+        // Subtítulos desde la transcripción: útiles sobre todo en pantalla completa.
+        const pista = [...el.textTracks].find((t) => t.kind === "captions");
+        if (pista) pista.mode = pista.mode === "showing" ? "disabled" : "showing";
       }
     };
     window.addEventListener("keydown", onKey);
@@ -137,6 +162,7 @@ export default function App() {
       ))}
     </div>
   );
+  const botonPanel = <BotonPanelCompleto activo={panelCompleto} alternar={alternarPanel} />;
   const modelo = t?.header.replace(/^\[|\]$/g, "").split("|")[0]?.trim();
 
   return (
@@ -160,6 +186,17 @@ export default function App() {
             </div>
           )}
         </div>
+        <button
+          className={`boton-icono recargar${cargando ? " girando" : ""}`}
+          onClick={cargar}
+          disabled={cargando}
+          title="Recargar transcripción, resumen e índice (sin perder el punto del video)"
+          aria-label="Recargar datos"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
+            <path fill="currentColor" d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35Z" />
+          </svg>
+        </button>
         {t && (
           <div className="buscador">
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16a6.47 6.47 0 0 0 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5Zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14Z"/></svg>
@@ -210,6 +247,8 @@ export default function App() {
             mediaRef={mediaRef}
             capitulos={datos.capitulos ?? 0}
             miniaturas={!!datos.miniaturas}
+            subtitulos={subtitulos}
+            version={version}
             bajoSlider={
               <MapaTiempo
                 lineas={lineas}
@@ -226,12 +265,17 @@ export default function App() {
           <Leyenda lineas={lineas} hablantes={datos.hablantes} lineaActiva={lineaActiva} />
           <p className="atajos">
             <kbd>Espacio</kbd> reproducir · <kbd>J</kbd>/<kbd>L</kbd> ±10 s · <kbd>←</kbd>/<kbd>→</kbd> ±5 s ·{" "}
-            <kbd>/</kbd> buscar · <kbd>.</kbd> volver a lo que suena · clic en una palabra para saltar
+            <kbd>/</kbd> buscar · <kbd>.</kbd> volver a lo que suena · <kbd>C</kbd> subtítulos · clic en una
+            palabra para saltar
           </p>
         </section>
-        <section className="columna-texto" aria-label="Transcripción y documentos">
+        <section
+          ref={columnaTexto}
+          className={`columna-texto${panelCompleto ? " panel-completo" : ""}`}
+          aria-label="Transcripción y documentos"
+        >
           {docActivo ? (
-            <Documento doc={docActivo} mediaRef={mediaRef} onSaltar={saltar} pestanas={pestanas} />
+            <Documento doc={docActivo} mediaRef={mediaRef} onSaltar={saltar} pestanas={pestanas} acciones={botonPanel} />
           ) : (
           <Transcripcion
             pestanas={pestanas}
@@ -243,8 +287,10 @@ export default function App() {
             listaRef={listaRef}
             onSaltar={saltar}
             pedirSeguir={pedirSeguir}
+            acciones={botonPanel}
           />
           )}
+          {panelCompleto && <BarraFlotante audio={datos.video.audio} />}
         </section>
       </main>
     </div>

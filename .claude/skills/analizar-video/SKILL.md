@@ -89,30 +89,39 @@ uv run scripts/extract_frame.py reunion.mp4 --at 00:12:34
 uv run scripts/extract_frame.py reunion.mp4 --at 00:12:34 --range 3 --fps 2   # si no alcanzó
 ```
 
-**Visor** (paso 7, el cierre): video y transcripción sincronizados en el
-navegador, con resaltado palabra a palabra (si se transcribió con `--words`),
+**Visor** (paso 7, el cierre): video y transcripción sincronizados en una
+ventana propia, con resaltado palabra a palabra (si se transcribió con `--words`),
 colores por hablante y búsqueda. Si existen, el resumen y el índice más
 recientes aparecen como pestañas junto a la transcripción, y cada `[HH:MM:SS]`
 que contengan lleva a ese momento del video; las imágenes que referencien dentro
 de `<video>_analisis/` (los frames) se muestran. Si hay índice, sus capítulos
 además parten la barra de tiempo en tramos y, al pasar el mouse, se ve el título
-del capítulo y una miniatura del video, como en YouTube. Por eso conviene
+del capítulo y una miniatura del video, como en YouTube. La tecla `C` (o el
+botón CC) muestra la transcripción como subtítulos, también en pantalla
+completa. El panel de texto tiene su propia pantalla completa, para leer el
+resumen con renglones largos mientras el video sigue sonando y se maneja desde
+una barra flotante. Por eso conviene
 ofrecerlo al final, cuando ya está todo escrito:
 
 > ¿Quieres abrirlo en el visor? Video y transcripción sincronizados, con el
 > resumen y el índice en pestañas.
 
-Lánzalo **en background** y entrégale al usuario la URL que imprime. **Se
-cierra solo**: el servidor vive mientras haya una pestaña del visor abierta y
+Lánzalo **en background** y entrégale al usuario la URL que imprime. Se abre
+en una **ventana propia** (el modo app de Edge, Chrome o Brave: sin pestañas ni
+barra de direcciones); si el usuario prefiere una pestaña de su navegador, usa
+`--navegador`. Sin un navegador Chromium instalado, cae solo a una pestaña.
+**Se cierra solo**: el servidor vive mientras haya una ventana del visor abierta y
 termina unos segundos después de que el usuario cierra la última (una recarga
 no lo cierra); si nadie abre la URL en 10 minutos, también termina. No hace
 falta matarlo ni pedirle al usuario que lo haga. Si el usuario quiere volver a
 verlo después, se lanza de nuevo. Si escribes un resumen o índice nuevo con el
-visor abierto, basta con que el usuario recargue la página.
+visor abierto, basta con que el usuario pulse el botón de recargar de la
+cabecera: trae los datos nuevos sin perder el punto del video.
 
 ```bash
-uv run scripts/visor.py reunion.mp4            # abre el navegador
-uv run scripts/visor.py reunion.mp4 --no-open  # solo imprime la URL
+uv run scripts/visor.py reunion.mp4              # ventana propia
+uv run scripts/visor.py reunion.mp4 --navegador  # pestaña del navegador
+uv run scripts/visor.py reunion.mp4 --no-open    # solo imprime la URL
 ```
 
 Solo usa la librería estándar y la UI ya compilada en `visor/`. Si el formato no

@@ -8,6 +8,11 @@ import { subtitulosVTT } from "./lib/subtitulos";
 import { Leyenda, MapaTiempo } from "./components/MapaTiempo";
 import { Transcripcion } from "./components/Transcripcion";
 import { Documento } from "./components/Documento";
+import {
+  ATAJOS, Aviso, AtajosFlotantes, Buscador, CompositorNota, Flotante, useElementoPantallaCompleta,
+} from "./components/Flotantes";
+import { fmt } from "./lib/util";
+import type { Documento as Doc } from "./tipos";
 
 export default function App() {
   const [datos, setDatos] = useState<Datos | null>(null);
@@ -25,6 +30,14 @@ export default function App() {
   const buscador = useRef<HTMLInputElement>(null);
   const columnaTexto = useRef<HTMLElement>(null);
   const [panelCompleto, alternarPanel] = usePanelCompleto(columnaTexto);
+  const fsEl = useElementoPantallaCompleta();
+  const enPantallaCompleta = panelCompleto || !!fsEl;
+  const buscadorFlotante = useRef<HTMLInputElement>(null);
+  const [buscarFlotante, setBuscarFlotante] = useState(false);
+  const [atajosAbiertos, setAtajosAbiertos] = useState(false);
+  // Nota en curso: el momento del video al apretar N, y si hay que reanudar al terminar.
+  const [nota, setNota] = useState<{ t: number; reanudar: boolean } | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   // Recargar vuelve a pedir los datos sin recargar la página: si se abrió el
   // visor antes de tener resumen, índice o hablantes, aparecen sin perder el
@@ -81,6 +94,71 @@ export default function App() {
     setPedirSeguir((n) => n + 1);
   }, []);
 
+  const abrirNota = useCallback(() => {
+    const el = mediaRef.current;
+    if (!el) return;
+    const reanudar = !el.paused;
+    el.pause(); // mientras se escribe, el video espera
+    setNota({ t: el.currentTime, reanudar });
+  }, []);
+
+  const cerrarNota = useCallback((reanudar: boolean) => {
+    setNota(null);
+    if (reanudar) void mediaRef.current?.play();
+  }, []);
+
+  const guardarNota = useCallback(
+    async (texto: string) => {
+      if (!nota) return;
+      const r = await fetch("api/notas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ t: nota.t, texto }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const doc: Doc = await r.json();
+      setDatos((d) => (d ? { ...d, documentos: [...d.documentos.filter((x) => x.tipo !== "notas"), doc] } : d));
+      setAviso(`Nota guardada en ${fmt(nota.t)}`);
+      cerrarNota(nota.reanudar);
+    },
+    [nota, cerrarNota],
+  );
+
+  useEffect(() => {
+    if (!aviso) return;
+    const id = window.setTimeout(() => setAviso(null), 2600);
+    return () => window.clearTimeout(id);
+  }, [aviso]);
+
+  // Mientras se escribe una nota o se busca, los atajos de Media Chrome se
+  // apagan: con el video en pantalla completa esos campos viven dentro del
+  // reproductor, y su Espacio, K, F o flechas se comerían lo que se escribe.
+  useEffect(() => {
+    const mc = document.getElementById("reproductor");
+    if (!mc) return;
+    if (nota || buscarFlotante) mc.setAttribute("nohotkeys", "");
+    else mc.removeAttribute("nohotkeys");
+  }, [nota, buscarFlotante]);
+
+  // El buscador flotante solo existe en pantalla completa.
+  useEffect(() => {
+    if (!enPantallaCompleta) setBuscarFlotante(false);
+  }, [enPantallaCompleta]);
+  useEffect(() => {
+    if (buscarFlotante) buscadorFlotante.current?.focus();
+  }, [buscarFlotante]);
+
+  const cambiarConsulta = useCallback((q: string) => {
+    setConsulta(q);
+    setPestana("transcripcion"); // la búsqueda es sobre lo que se dijo
+  }, []);
+  const cerrarBusqueda = useCallback(() => {
+    setConsulta("");
+    setBuscarFlotante(false);
+    (document.activeElement as HTMLElement | null)?.blur();
+    setPedirSeguir((n) => n + 1);
+  }, []);
+
   const moverResultado = useCallback(
     (paso: number) => {
       if (!coincidencias.length) return;
@@ -92,17 +170,41 @@ export default function App() {
     [actual, visitado, coincidencias, lineas, saltar],
   );
 
+  // Lo que el manejador de teclas necesita leer sin volver a registrarse.
+  const estado = useRef({ enPantallaCompleta, notaAbierta: !!nota, abrirNota });
+  estado.current = { enPantallaCompleta, notaAbierta: !!nota, abrirNota };
+
   // Atajos globales (fuera de campos de texto).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = mediaRef.current;
       const enCampo = (e.target as HTMLElement)?.closest("input, textarea, [contenteditable]");
-      if (e.key === "/" && !enCampo) {
+      // Ctrl+F / ⌘F: el buscador del visor reemplaza al del navegador, que no ve
+      // la transcripción entera (la lista es virtual: solo existe lo visible).
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "f") {
         e.preventDefault();
-        buscador.current?.focus();
+        if (estado.current.enPantallaCompleta) {
+          setBuscarFlotante(true);
+          buscadorFlotante.current?.focus();
+          buscadorFlotante.current?.select();
+        } else {
+          buscador.current?.focus();
+          buscador.current?.select();
+        }
         return;
       }
       if (enCampo || !el || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (estado.current.notaAbierta) return;
+      if (e.key === "?") {
+        e.preventDefault();
+        setAtajosAbiertos((v) => !v);
+        return;
+      }
+      if (e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        estado.current.abrirNota();
+        return;
+      }
       const k = e.key.toLowerCase();
       // Con el foco dentro del reproductor, Media Chrome ya atiende estas teclas:
       // atenderlas también acá las aplicaría dos veces (play y pausa a la vez).
@@ -158,6 +260,7 @@ export default function App() {
           onClick={() => setPestana(p.tipo)}
         >
           {p.titulo}
+          {"cantidad" in p && p.cantidad ? <span className="pestana-cuenta">{p.cantidad}</span> : null}
         </button>
       ))}
     </div>
@@ -198,43 +301,15 @@ export default function App() {
           </svg>
         </button>
         {t && (
-          <div className="buscador">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16a6.47 6.47 0 0 0 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5Zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14Z"/></svg>
-            <input
-              ref={buscador}
-              type="search"
-              placeholder="Buscar en lo que se dijo  ( / )"
-              value={consulta}
-              onChange={(e) => {
-                setConsulta(e.target.value);
-                setPestana("transcripcion"); // la búsqueda es sobre lo que se dijo
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  moverResultado(e.shiftKey ? -1 : 1);
-                } else if (e.key === "Escape") {
-                  setConsulta("");
-                  (e.target as HTMLInputElement).blur();
-                  setPedirSeguir((n) => n + 1);
-                }
-              }}
-              aria-label="Buscar en la transcripción"
-            />
-            {consulta.trim().length >= 2 && (
-              <div className="buscador-nav">
-                <span className="contador">
-                  {coincidencias.length ? `${actual + 1} / ${coincidencias.length}` : "0"}
-                </span>
-                <button onClick={() => moverResultado(-1)} disabled={!coincidencias.length} aria-label="Resultado anterior">
-                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden><path fill="currentColor" d="m7.4 15.4 4.6-4.6 4.6 4.6L18 14l-6-6-6 6z"/></svg>
-                </button>
-                <button onClick={() => moverResultado(1)} disabled={!coincidencias.length} aria-label="Resultado siguiente">
-                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden><path fill="currentColor" d="M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></svg>
-                </button>
-              </div>
-            )}
-          </div>
+          <Buscador
+            inputRef={buscador}
+            consulta={consulta}
+            setConsulta={cambiarConsulta}
+            total={coincidencias.length}
+            actual={actual}
+            mover={moverResultado}
+            onEscape={cerrarBusqueda}
+          />
         )}
       </header>
 
@@ -264,9 +339,13 @@ export default function App() {
           />
           <Leyenda lineas={lineas} hablantes={datos.hablantes} lineaActiva={lineaActiva} />
           <p className="atajos">
-            <kbd>Espacio</kbd> reproducir · <kbd>J</kbd>/<kbd>L</kbd> ±10 s · <kbd>←</kbd>/<kbd>→</kbd> ±5 s ·{" "}
-            <kbd>/</kbd> buscar · <kbd>.</kbd> volver a lo que suena · <kbd>C</kbd> subtítulos · clic en una
-            palabra para saltar
+            {ATAJOS.slice(0, -1).map(([k, d], i) => (
+              <span key={k}>
+                {i > 0 && " · "}
+                <kbd>{k}</kbd> {d}
+              </span>
+            ))}
+            {" · clic en una palabra para saltar"}
           </p>
         </section>
         <section
@@ -293,6 +372,39 @@ export default function App() {
           {panelCompleto && <BarraFlotante audio={datos.video.audio} />}
         </section>
       </main>
+
+      {/* Flotantes: dentro del elemento en pantalla completa si lo hay. */}
+      <Flotante destino={fsEl}>
+        {nota && (
+          <CompositorNota t={nota.t} onGuardar={guardarNota} onCerrar={() => cerrarNota(nota.reanudar)} elevada={enPantallaCompleta} />
+        )}
+        {!nota && aviso && (
+          <Aviso
+            texto={aviso}
+            elevado={enPantallaCompleta}
+            accion={
+              pestana !== "notas" && !fsEl ? (
+                <button className="aviso-accion" onClick={() => setPestana("notas")}>Ver notas</button>
+              ) : undefined
+            }
+          />
+        )}
+        {enPantallaCompleta && buscarFlotante && t && (
+          <Buscador
+            flotante
+            inputRef={buscadorFlotante}
+            consulta={consulta}
+            setConsulta={cambiarConsulta}
+            total={coincidencias.length}
+            actual={actual}
+            mover={moverResultado}
+            onEscape={cerrarBusqueda}
+          />
+        )}
+        {(enPantallaCompleta || atajosAbiertos) && (
+          <AtajosFlotantes abierto={atajosAbiertos} alternar={() => setAtajosAbiertos((v) => !v)} />
+        )}
+      </Flotante>
     </div>
   );
 }

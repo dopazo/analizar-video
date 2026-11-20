@@ -101,13 +101,18 @@ export function Documento({ doc, mediaRef, onSaltar, pestanas, acciones }: Props
       previo = actual;
     };
     marcar();
+    // En el índice y en las notas se abre donde va el video; un resumen, arriba.
+    const inicial = previo as (typeof botones)[number] | null; // marcar() lo asignó
+    if (doc.tipo !== "resumen") inicial?.fila?.scrollIntoView({ block: "center" });
     el.addEventListener("timeupdate", marcar);
     el.addEventListener("seeked", marcar);
     return () => {
       el.removeEventListener("timeupdate", marcar);
       el.removeEventListener("seeked", marcar);
     };
-  }, [html, mediaRef]);
+  }, [html, mediaRef, doc.tipo]);
+
+  const vacio = doc.tipo === "notas" && !doc.cantidad;
 
   return (
     <div className="transcripcion">
@@ -118,6 +123,15 @@ export function Documento({ doc, mediaRef, onSaltar, pestanas, acciones }: Props
           {acciones}
         </div>
       </div>
+      {vacio ? (
+        <div className="vacia">
+          <p>Todavía no hay notas.</p>
+          <p className="tenue">
+            Presiona <kbd>N</kbd> en cualquier momento del video para anotar algo. Queda guardado en{" "}
+            <code>{doc.archivo}</code>, junto a la transcripción, para tus próximas revisiones.
+          </p>
+        </div>
+      ) : (
       <div
         ref={cont}
         className="documento"
@@ -126,6 +140,7 @@ export function Documento({ doc, mediaRef, onSaltar, pestanas, acciones }: Props
           if (b) onSaltar(Number(b.dataset.t));
         }}
       />
+      )}
     </div>
   );
 }

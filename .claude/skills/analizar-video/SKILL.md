@@ -100,8 +100,18 @@ del capítulo y una miniatura del video, como en YouTube. La tecla `C` (o el
 botón CC) muestra la transcripción como subtítulos, también en pantalla
 completa. El panel de texto tiene su propia pantalla completa, para leer el
 resumen con renglones largos mientras el video sigue sonando y se maneja desde
-una barra flotante. Por eso conviene
-ofrecerlo al final, cuando ya está todo escrito:
+una barra flotante. `Ctrl+F` (`⌘F` en Mac) busca en la transcripción, en vez
+del buscador del navegador.
+
+**Notas del usuario.** Con la tecla `N` el usuario anota algo en el momento
+actual del video (el video se pausa mientras escribe). Las notas se guardan en
+`<video>_analisis/<video>_notas.md`, una línea `- [HH:MM:SS] texto · _fecha_`
+por nota, ordenadas por el momento del video, y aparecen en la pestaña Notas.
+Son del usuario: **léelas al retomar el trabajo sobre un video** (responden a
+"¿qué me quedó pendiente?" o "¿qué marqué?") y úsalas como contexto al resumir,
+pero no las reescribas ni las borres sin que lo pida.
+
+Por eso conviene ofrecer el visor al final, cuando ya está todo escrito:
 
 > ¿Quieres abrirlo en el visor? Video y transcripción sincronizados, con el
 > resumen y el índice en pestañas.
@@ -317,6 +327,7 @@ reunion_analisis/
 ├── reunion_audio.m4a                        # caché, se reutiliza
 ├── reunion_visor.mp4                        # solo si el formato no se reproducía en el navegador
 ├── reunion_miniaturas.jpg / .vtt           # vista previa de la barra del visor (caché)
+├── reunion_notas.md                         # notas del usuario desde el visor (tecla N)
 └── frames/
     └── frame_HH-MM-SS.mmm.png
 ```

@@ -26,10 +26,12 @@ export interface Datos {
 }
 
 export interface Documento {
-  tipo: "resumen" | "indice";
+  tipo: "resumen" | "indice" | "notas";
   titulo: string;
   archivo: string;
   md: string;
+  /** solo en "notas": cuántas hay */
+  cantidad?: number;
 }
 
 /** Una línea ya preparada para pintar y buscar. */

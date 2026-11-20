@@ -3,7 +3,7 @@ import type { Datos } from "./tipos";
 import { buscar, prepararLineas } from "./lib/util";
 import { useSincronia } from "./lib/sincronia";
 import { Reproductor } from "./components/Reproductor";
-import { MapaTiempo } from "./components/MapaTiempo";
+import { Leyenda, MapaTiempo } from "./components/MapaTiempo";
 import { Transcripcion } from "./components/Transcripcion";
 
 export default function App() {
@@ -166,16 +166,24 @@ export default function App() {
 
       <main className="cuerpo">
         <section className="columna-video">
-          <Reproductor url={datos.video.url} nombre={datos.video.nombre} audio={datos.video.audio} mediaRef={mediaRef} />
-          <MapaTiempo
-            lineas={lineas}
-            hablantes={datos.hablantes}
-            duracion={durMapa}
-            coincidencias={coincidencias}
-            actual={actual}
+          <Reproductor
+            url={datos.video.url}
+            nombre={datos.video.nombre}
+            audio={datos.video.audio}
             mediaRef={mediaRef}
-            onSaltar={saltar}
+            bajoSlider={
+              <MapaTiempo
+                lineas={lineas}
+                hablantes={datos.hablantes}
+                duracion={durMapa}
+                coincidencias={coincidencias}
+                actual={actual}
+                mediaRef={mediaRef}
+                onSaltar={saltar}
+              />
+            }
           />
+          <Leyenda hablantes={datos.hablantes} />
           <p className="atajos">
             <kbd>Espacio</kbd> reproducir · <kbd>J</kbd>/<kbd>L</kbd> ±10 s · <kbd>←</kbd>/<kbd>→</kbd> ±5 s ·{" "}
             <kbd>/</kbd> buscar · <kbd>.</kbd> volver a lo que suena · clic en una palabra para saltar

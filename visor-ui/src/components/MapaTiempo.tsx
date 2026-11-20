@@ -98,16 +98,20 @@ export const MapaTiempo = memo(function MapaTiempo({
         <div className="mapa-hover" ref={hover} />
         <div className="mapa-cabezal" ref={cabezal} />
       </div>
-      {hablantes.length > 0 && (
-        <div className="mapa-leyenda">
-          {hablantes.map((h) => (
-            <span key={h} className={`chip-leyenda h${colorHablante(hablantes, h)}`}>
-              <i />
-              {h}
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 });
+
+export function Leyenda({ hablantes }: { hablantes: string[] }) {
+  if (!hablantes.length) return null;
+  return (
+    <div className="mapa-leyenda">
+      {hablantes.map((h) => (
+        <span key={h} className={`chip-leyenda h${colorHablante(hablantes, h)}`}>
+          <i />
+          {h}
+        </span>
+      ))}
+    </div>
+  );
+}

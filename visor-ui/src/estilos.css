@@ -127,10 +127,16 @@ button { font: inherit; color: inherit; }
 }
 
 /* ---------- reproductor ---------- */
+/* Video arriba y, pegado debajo, un panel con el slider, la franja de
+   hablantes (mismo ancho que el slider, así un punto del slider cae sobre el
+   bloque de quien habla en ese momento) y los botones. */
+.reproductor-bloque {
+  border-radius: var(--radio); overflow: hidden; box-shadow: var(--sombra);
+  border: 1px solid var(--borde); background: var(--superficie);
+}
 .reproductor {
-  width: 100%; aspect-ratio: 16 / 9; max-height: calc(100vh - 230px);
-  border-radius: var(--radio); overflow: hidden; background: #000;
-  box-shadow: var(--sombra);
+  display: block; width: 100%; aspect-ratio: 16 / 9; max-height: calc(100vh - 290px);
+  background: #000;
   --media-primary-color: #fff;
   --media-secondary-color: transparent;
   --media-control-background: transparent;
@@ -142,20 +148,50 @@ button { font: inherit; color: inherit; }
   --media-font-size: 13px;
 }
 .reproductor video { width: 100%; height: 100%; object-fit: contain; }
-.barra-controles {
-  width: 100%;
+.barra-pantalla-completa {
+  display: none; width: 100%; padding: 18px 8px 6px;
   background: linear-gradient(to top, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
-  padding: 18px 6px 4px;
 }
-.barra-controles media-time-range { flex: 1; }
-.solo-audio {
-  aspect-ratio: auto; height: auto; background: var(--superficie);
-  border: 1px solid var(--borde);
+.barra-pantalla-completa media-time-range { flex: 1; }
+.reproductor[mediaisfullscreen] .barra-pantalla-completa { display: flex; }
+
+.controles {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 6px;
   --media-primary-color: var(--texto);
+  --media-secondary-color: transparent;
+  --media-control-background: transparent;
   --media-control-hover-background: var(--superficie-2);
+  --media-text-color: var(--texto);
+  --media-icon-color: var(--texto);
+  --media-font-family: var(--fuente);
+  --media-font-size: 13px;
   --media-range-track-background: var(--borde);
+  --media-range-bar-color: var(--acento);
+  --media-range-thumb-background: var(--acento);
+  --media-time-range-buffered-color: color-mix(in srgb, var(--tenue) 35%, transparent);
+  --media-tooltip-display: none;
 }
-.solo-audio .barra-controles { background: none; padding: 4px; }
+/* Sin relleno lateral: el 0 % y el 100 % del slider coinciden con los bordes de la franja. */
+.slider {
+  display: block; width: 100%;
+  --media-range-padding: 0px;
+  --media-control-height: 18px;
+  --media-range-track-height: 6px;
+  --media-range-track-border-radius: 3px;
+  --media-range-thumb-width: 14px;
+  --media-range-thumb-height: 14px;
+  --media-preview-time-background: var(--texto);
+  --media-preview-time-text-color: var(--superficie);
+  --media-preview-time-border-radius: 4px;
+}
+.barra-controles { width: 100%; margin: 0 -6px; }
+.barra-controles .espaciador { flex: 1; }
+.separador-tiempo { color: var(--tenue); font-size: 13px; padding: 0 2px; align-self: center; }
+.barra-controles media-time-display,
+.barra-controles media-duration-display { padding-left: 4px; padding-right: 4px; font-variant-numeric: tabular-nums; }
+.barra-controles media-duration-display { color: var(--tenue); }
+
+.solo-audio { aspect-ratio: auto; height: auto; background: var(--superficie); }
 .portada-audio {
   display: flex; align-items: center; gap: 12px; padding: 22px 20px 8px;
   color: var(--acento); font-weight: 600;
@@ -163,13 +199,12 @@ button { font: inherit; color: inherit; }
 .portada-audio span { color: var(--texto); }
 
 /* ---------- mapa de tiempo ---------- */
-.mapa { display: flex; flex-direction: column; gap: 8px; }
-.mapa-vacio { height: 22px; }
+.mapa-vacio { height: 14px; }
 .mapa-carril {
-  position: relative; height: 22px; border-radius: 6px; cursor: pointer;
-  background: var(--superficie-2); border: 1px solid var(--borde); overflow: hidden;
+  position: relative; height: 14px; border-radius: 3px; cursor: pointer;
+  background: var(--superficie-2);
 }
-.mapa-bloque { position: absolute; top: 4px; bottom: 4px; border-radius: 2px; background: var(--hc); opacity: 0.85; }
+.mapa-bloque { position: absolute; top: 0; bottom: 0; border-radius: 2px; background: var(--hc); opacity: 0.8; }
 .mapa-carril:hover .mapa-bloque { opacity: 1; }
 .mapa-marca {
   position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px;
@@ -177,7 +212,7 @@ button { font: inherit; color: inherit; }
 }
 .mapa-marca.actual { opacity: 1; width: 4px; box-shadow: 0 0 0 1px var(--superficie); }
 .mapa-cabezal {
-  position: absolute; top: -1px; bottom: -1px; width: 2px; margin-left: -1px;
+  position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px;
   background: var(--texto); pointer-events: none;
 }
 .mapa-hover {
@@ -252,13 +287,14 @@ kbd {
 /* ---------- pantallas angostas ---------- */
 @media (max-width: 900px) {
   .cuerpo { grid-template-columns: 1fr; grid-template-rows: auto minmax(320px, 1fr); padding: 12px 16px; }
-  .reproductor { max-height: 45vh; }
+  .reproductor { max-height: 42vh; }
   .atajos { display: none; }
   .cabecera { flex-wrap: wrap; padding: 10px 16px; }
   .buscador { flex: 1 1 100%; }
   .hablante { margin-left: 70px; }
   .fila-cuerpo { grid-template-columns: 64px 1fr 28px; }
   .ts { font-size: 11px; }
+  .separador-tiempo,
   .barra-controles media-seek-backward-button,
   .barra-controles media-seek-forward-button,
   .barra-controles media-volume-range,

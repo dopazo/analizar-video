@@ -197,6 +197,9 @@ nombre en el paso 3.
 **Primera corrida: pide permiso antes.** Descarga ~3 GB (torch con CUDA,
 transformers desde GitHub y el modelo) a la caché de uv y de Hugging Face.
 `check_env.py` dice si ya está todo (`diarizacion.listo`) y cuánto falta bajar.
+Esa primera corrida necesita **git** (`diarizacion.git`): uv clona transformers
+desde GitHub. Si falta, díselo al usuario antes de lanzarla, con el comando de
+instalación que imprime `check_env.py`, en vez de dejar que falle a mitad.
 
 Referencia (35 min de reunión, RTX 4060 Laptop): 6 s y ~650 MiB de VRAM en el
 modo por defecto (`offline`, ventana de 30,4 s). Si no hay memoria, cae solo a

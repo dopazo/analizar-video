@@ -153,6 +153,9 @@ def diarizacion(gpu: dict) -> dict:
     return {
         "modelo_mb": mb,
         "torch": torch_v,
+        # transformers se instala desde GitHub (el soporte del modelo aún no sale
+        # en PyPI): uv necesita el ejecutable git para clonarlo la primera vez.
+        "git": shutil.which("git") is not None,
         "listo": mb is not None and torch_v is not None,
         "device": device,
         "descarga_pendiente_gb": (0 if mb is not None and torch_v is not None
@@ -207,6 +210,16 @@ def suggest(gpu: dict, cuda_libs: bool | None, descargados: dict[str, int]) -> d
     return {"device": "cuda", "model": elegido, "compute_type": ct, "reason": motivo}
 
 
+def git_install_cmd() -> str:
+    system = platform.system()
+    if system == "Windows":
+        return ("winget install --id Git.Git -e  (sin permisos de administrador: "
+                "PortableGit desde https://git-scm.com/download/win, agregando su carpeta cmd al PATH del usuario)")
+    if system == "Darwin":
+        return "xcode-select --install  (o brew install git)"
+    return "sudo apt install git"
+
+
 def ffmpeg_install_cmd() -> str:
     system = platform.system()
     if system == "Windows":
@@ -242,7 +255,9 @@ def collect() -> dict:
     if not report["ffmpeg"]:
         report["missing"].append("ffmpeg")
         report["warnings"].append(
-            "Falta el binario ffmpeg (necesario para extraer frames). "
+            "Falta el binario ffmpeg: sin el no se extraen frames ni se cortan tramos, "
+            "y el visor queda sin miniaturas en la barra ni conversion de .mkv/.avi "
+            "(la transcripcion funciona igual). "
             "Instalar con: " + ffmpeg_install_cmd())
 
     missing_py = [pkg for pkg, ok in deps.items() if not ok]
@@ -269,6 +284,14 @@ def collect() -> dict:
             "agrega las librerias a la propia corrida:\n    " + GPU_HINT +
             "\n  (o, si usas tu propio entorno de Python en vez de uv: "
             "pip install nvidia-cublas-cu12 \"nvidia-cudnn-cu12>=9,<10\")")
+
+    dz = report["diarizacion"]
+    if not dz["git"] and not dz["torch"]:
+        report["warnings"].append(
+            "Para diarizar (opcional) falta git: la primera corrida de diarizar.py "
+            "instala transformers desde GitHub y uv lo clona con git. Sin git falla con "
+            "'Git executable not found'. Transcribir y el resto no lo necesitan. "
+            "Instalar con: " + git_install_cmd())
 
     cuda = gpu.get("cuda_version")
     if gpu["available"] and cuda:
@@ -326,6 +349,8 @@ def print_human(r: dict) -> None:
     print("  Modelo : " + (f"descargado ({dz['modelo_mb']} MB)" if dz["modelo_mb"]
                            else f"sin descargar (~{DIAR_MODELO_MB} MB)"))
     print("  torch  : " + (dz["torch"] or "sin instalar (~2,6 GB, entorno de uv)"))
+    if not dz["torch"]:
+        print("  git    : " + ("si" if dz["git"] else "NO (lo necesita la primera corrida)"))
     if dz["listo"]:
         print(f"  Listo; correria en {dz['device']}.")
     else:

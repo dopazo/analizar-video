@@ -200,23 +200,46 @@ Los ejemplos de este README usan `.claude/skills/analizar-video/` como ruta.
 uv run ~/.claude/skills/analizar-video/scripts/check_env.py
 ```
 
-Te dice si falta `ffmpeg`, si hay GPU NVIDIA utilizable, qué modelos tienes
-descargados y qué nivel conviene según la VRAM libre.
+Te dice si falta `ffmpeg` (o `git`, para diarizar), si hay GPU NVIDIA
+utilizable, qué modelos tienes descargados y qué nivel conviene según la VRAM
+libre.
 
 ### Requisitos
 
-- **Python 3.9+** (3.11+ para `diarizar.py`)
+- **Python 3.9+** (3.11+ para `diarizar.py`). Si no lo tienes, `uv python
+  install` lo deja en tu carpeta de usuario.
 - **[uv](https://docs.astral.sh/uv/)** (recomendado): los scripts declaran sus
   dependencias inline (PEP 723), así que `uv run script.py` las resuelve solo,
   sin instalar nada global. Si prefieres tu propio entorno, instala las
   dependencias del `pyproject.toml` de la skill y usa `python script.py`.
-- **ffmpeg** en el PATH — para frames, recortes de tramo y caché de audio. La
-  transcripción funciona sin él.
-- **GPU NVIDIA** — opcional. Sin GPU funciona igual, más lento.
-- **Diarización** — opcional. La primera corrida descarga ~3 GB (PyTorch con
-  CUDA, `transformers` desde GitHub porque el modelo aún no está en un release,
-  y el modelo de ~400 MB). En una RTX 4060 Laptop diariza 35 minutos en 6
-  segundos con ~650 MiB de VRAM; en CPU no está probado.
+- **ffmpeg** en el PATH (trae `ffprobe`): para frames, recortes de tramo y caché
+  de audio, y en el visor para las miniaturas de la barra, la duración de los
+  capítulos y convertir `.mkv`/`.avi` a algo que el navegador reproduzca. La
+  transcripción funciona sin él, y el visor abre igual, pero sin esas partes.
+- **GPU NVIDIA**: opcional. Sin GPU funciona todo igual, en CPU y más lento
+  (`check_env.py` sugiere `small` con int8). Ver "GPU: cuBLAS y cuDNN" abajo.
+- **Diarización**: opcional.
+  - La primera corrida descarga ~3 GB: PyTorch con CUDA, `transformers` y el
+    modelo de ~400 MB.
+  - Necesita **git**: el soporte del modelo todavía no sale en una versión de
+    `transformers` en PyPI, así que `uv` la instala desde GitHub, y para
+    clonarla usa el `git` del equipo. Sin git falla con *Git executable not
+    found*. Solo hace falta la primera vez; nada más de la skill lo usa.
+  - En una RTX 4060 Laptop diariza 35 minutos en 6 segundos con ~650 MiB de
+    VRAM; en CPU no está probado.
+- **Navegador** para el visor: cualquiera sirve. Para que abra en una ventana
+  propia, sin pestañas, uno basado en Chromium (Edge, Chrome o Brave; en
+  Windows, Edge ya viene instalado). Sin ninguno, abre una pestaña normal.
+
+**No hace falta:**
+- **Node.js**: el visor viaja ya compilado dentro de la skill. Solo se usa para
+  modificar su interfaz (`visor-ui/`).
+- **Permisos de administrador**: uv, Python, ffmpeg y git se pueden instalar en
+  tu carpeta de usuario. Para ffmpeg, el zip ya compilado descomprimido en una
+  carpeta propia y agregada al PATH de usuario; para git, PortableGit.
+- **Cuentas o servicios externos**: todo corre en local.
+
+`check_env.py` revisa todo esto y dice qué falta.
 
 ## Detalles técnicos
 

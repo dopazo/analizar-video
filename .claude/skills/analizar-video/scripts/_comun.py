@@ -63,16 +63,37 @@ def _peso_mb(d: Path) -> int:
 
     El layout es blobs/ (los datos) + snapshots/ (enlaces a blobs). Sumar todo
     cuenta cada archivo dos veces, asi que se mide solo blobs/ cuando existe.
+    Con hf-xet, los propios blobs pueden ser enlaces a una carpeta blobs/
+    compartida en la raiz del hub: se siguen y se cuenta cada destino una vez.
     """
     base = d / "blobs" if (d / "blobs").is_dir() else d
     total = 0
+    vistos: set[Path] = set()
     for f in base.rglob("*"):
         try:
-            if f.is_file() and not f.is_symlink():
-                total += f.stat().st_size
+            real = f.resolve()
+            if real in vistos or not real.is_file():
+                continue
+            vistos.add(real)
+            total += real.stat().st_size
         except OSError:
             continue
     return round(total / 1e6)
+
+
+# Diarizacion (diarizar.py). Se mide aparte porque no es un nivel de Whisper.
+DIAR_REPO = "models--nvidia--Nemotron-3-Diarization"
+DIAR_MODELO_MB = 400
+# Primera corrida de diarizar.py: torch con CUDA + transformers + modelo.
+DIAR_DESCARGA_GB = 3
+
+
+def modelo_diarizacion_mb() -> int | None:
+    """MB del modelo de diarizacion en la cache, o None si no esta."""
+    d = hf_cache_dir() / DIAR_REPO
+    if not d.is_dir() or not any(d.rglob("*.safetensors")):
+        return None
+    return _peso_mb(d)
 
 
 def escanear_modelos() -> dict[str, int]:

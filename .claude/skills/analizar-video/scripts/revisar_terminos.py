@@ -35,7 +35,8 @@ import unicodedata
 from collections import Counter
 from pathlib import Path
 
-RE_TIMESTAMP = re.compile(r"^\[\d{2}:\d{2}:\d{2}\.\d{3}\]\s*")
+# El prefijo opcional `speaker_N:` es el que agrega diarizar.py.
+RE_TIMESTAMP = re.compile(r"^\[\d{2}:\d{2}:\d{2}\.\d{3}\]\s*(?:speaker_[\d?]+:\s*)?")
 RE_HEADER = re.compile(r"^\[[^\]]*\|[^\]]*\|[^\]]*\]\s*$")
 _PALABRA = r"[^\W\d_]+(?:-[^\W\d_]+)*"
 RE_PALABRA = re.compile(_PALABRA, re.UNICODE)

@@ -17,6 +17,15 @@ gpu = [
     "nvidia-cudnn-cu12>=9,<10",
 ]
 
+# diarizar.py (quien habla). Con uv no hace falta: el script trae su bloque
+# PEP 723 con torch CUDA y el commit de transformers fijado. Para tu propio
+# entorno, instala torch desde https://download.pytorch.org/whl/cu128.
+diarizacion = [
+    "torch",
+    "numpy",
+    "transformers @ git+https://github.com/huggingface/transformers@297aafdb6dd64d63a335b3282bba6d35b4007836",
+]
+
 # Nota sobre CUDA 11:
 # Las versiones recientes de ctranslate2 requieren CUDA 12 + cuDNN 9. Si
 # check_env.py reporta que el driver expone CUDA 11, descomenta el pin de abajo

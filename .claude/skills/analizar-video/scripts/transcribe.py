@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import os
 import subprocess
 import sys
@@ -166,6 +167,7 @@ def _decodificar(model, fuente: Path, args):
         vad_filter=args.use_vad,
         beam_size=args.beam_size,
         condition_on_previous_text=not args.no_condition,
+        word_timestamps=args.words,
     )
     total = float(getattr(info, "duration", 0.0) or 0.0)
     log(f"Duracion detectada: {fmt_ts(total)}")
@@ -197,6 +199,12 @@ def _volcar_a_archivo(segmentos, media: Path, args, out_dir: Path,
     out = out_dir / f"{media.stem}_transcripcion_{ahora.strftime('%y%m%d_%H%M%S')}.txt"
     out.parent.mkdir(parents=True, exist_ok=True)
 
+    # Con --words, un sidecar .jsonl con las palabras y sus tiempos: es lo que
+    # necesita diarizar.py para asignar hablante palabra a palabra (un segmento
+    # de Whisper puede cruzar un cambio de turno).
+    palabras = out.with_name(out.stem + "_palabras.jsonl") if args.words else None
+    pfh = palabras.open("w", encoding="utf-8") if palabras else None
+
     n = 0
     ultimo_aviso = -10.0
     try:
@@ -209,12 +217,21 @@ def _volcar_a_archivo(segmentos, media: Path, args, out_dir: Path,
                     continue
                 fh.write(f"[{fmt_ts(seg.start)}] {texto}\n")
                 fh.flush()
+                if pfh:
+                    pfh.write(json.dumps({
+                        "start": round(seg.start, 3), "end": round(seg.end, 3),
+                        "words": [[round(w.start, 3), round(w.end, 3), w.word]
+                                  for w in (seg.words or [])],
+                    }, ensure_ascii=False) + "\n")
                 n += 1
                 if seg.end - ultimo_aviso >= 30:
                     ultimo_aviso = seg.end
                     pct = f" ({seg.end / total * 100:.0f}%)" if total else ""
                     log(f"  {fmt_ts(seg.end)} / {fmt_ts(total)}{pct} - {n} segmentos")
     except BaseException:
+        if pfh:
+            pfh.close()
+            palabras.unlink(missing_ok=True)
         # Un .txt a medias con solo el header seria reutilizado por la logica de
         # cache como si fuera una transcripcion valida. Mejor no dejar rastro.
         out.unlink(missing_ok=True)
@@ -226,8 +243,12 @@ def _volcar_a_archivo(segmentos, media: Path, args, out_dir: Path,
             "no se obtuvo ningun segmento de audio (archivo sin voz, corrupto, "
             "o idioma mal forzado con --language)")
 
+    if pfh:
+        pfh.close()
     log(f"Listo: {n} segmentos")
     log(f"Transcripcion guardada en: {out}")
+    if palabras:
+        log(f"Palabras con timestamps en: {palabras}")
     return out
 
 
@@ -257,6 +278,9 @@ def parse_args(argv=None):
                     help="Prompt condensado (~200 tokens) para sesgar el vocabulario")
     ap.add_argument("--use-vad", action="store_true",
                     help="Activa el filtro VAD de Silero (desactivado por defecto)")
+    ap.add_argument("--words", action="store_true",
+                    help="Guarda ademas <transcripcion>_palabras.jsonl con "
+                         "timestamps por palabra (lo usa diarizar.py)")
     ap.add_argument("--no-condition", action="store_true",
                     help="Desactiva condition_on_previous_text. Usar si el audio "
                          "tiene musica o tramos sin voz y el modelo entra en bucle "

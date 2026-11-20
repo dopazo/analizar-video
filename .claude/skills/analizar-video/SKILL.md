@@ -1,6 +1,6 @@
 ---
 name: analizar-video
-description: Transcribe videos y audios locales (reuniones, levantamientos con cliente, walkthroughs de procesos) con timestamps usando faster-whisper, y responde preguntas, arma resúmenes o actas sobre su contenido. Extrae frames puntuales del video cuando la pregunta toca algo visual (pantalla compartida, código, diagramas). Usar cuando el usuario entregue un archivo de video o audio local, o pida transcribir, resumir, buscar algo dicho en una grabación, o ver qué se mostraba en pantalla.
+description: Transcribe videos y audios locales (reuniones, levantamientos con cliente, walkthroughs de procesos) con timestamps usando faster-whisper, y responde preguntas, arma resúmenes o actas sobre su contenido. En reuniones identifica quién habla (diarización con Nemotron) y les pone nombre. Extrae frames puntuales del video cuando la pregunta toca algo visual (pantalla compartida, código, diagramas). Usar cuando el usuario entregue un archivo de video o audio local, o pida transcribir, resumir, buscar algo dicho en una grabación, o ver qué se mostraba en pantalla.
 ---
 
 # analizar-video
@@ -20,7 +20,8 @@ encadenes pasos por tu cuenta.
 | 0 | **Contexto/glosario** | Antes de transcribir. Si no hay `contexto_video.md`, **pregúntale al usuario** (ver abajo); no lo saltes |
 | 1 | **Verificar entorno** (`check_env.py`) | Primera corrida, o si algo falla. Si ya está listo, no molestar |
 | 2 | **Transcribir** (`transcribe.py`) | Siempre, salvo que ya exista transcripción reutilizable |
-| 3 | **Corregir términos** | Siempre después de transcribir: corre `revisar_terminos.py` y revisa la tabla |
+| 2b | **Diarizar** (`diarizar.py`) | Reuniones con varias personas, si el usuario quiere saber quién dijo qué. Requiere haber transcrito con `--words` |
+| 3 | **Corregir términos y nombrar hablantes** | Siempre después de transcribir: corre `revisar_terminos.py` y revisa la tabla. Si hubo diarización, en el mismo paso se proponen nombres para `speaker_N` (ver abajo) |
 | 4 | **Responder / resumir** | Según lo pedido. Resumir o explicar incluye el **sondeo visual** (ver abajo), no es un paso aparte. Al resumir, mencionar que queda un `.md` en `<video>_analisis/` |
 | 5 | **Índice de temas** | En videos largos, donde navegar el transcript se vuelve incómodo |
 | 6 | **Frames de apoyo** | Si la pregunta toca contenido visual, o si un walkthrough gana con capturas |
@@ -34,7 +35,9 @@ siguiente.
 
 1. **¿Ya hay transcripción?** Busca `<video>_analisis/*_transcripcion_*.txt`.
    Si existe, lee el header (`[modelo | idioma | fecha]`) del más reciente y
-   reutilízalo. Solo re-transcribe si el usuario lo pide o quiere otro nivel de
+   reutilízalo. De una misma corrida, prefiere en este orden:
+   `_hablantes_corregido.txt` > `_hablantes.txt` > `_corregido.txt` > el `.txt`
+   crudo. Solo re-transcribe si el usuario lo pide o quiere otro nivel de
    modelo.
 2. **¿Hay `contexto_video.md` o `glosario.md` junto al video?** Si sí, léelo
    completo y **condénsalo tú a ~200 tokens** (nombres propios, siglas, términos
@@ -53,7 +56,10 @@ siguiente.
    corregir a mano. Al terminar, ofrece guardar lo respondido como
    `contexto_video.md` junto al video, con `references/formato_contexto.md` como
    base — el archivo es el subproducto, no el requisito.
-3. **Avisa el tiempo estimado** en videos largos y **lanza la corrida en
+3. **¿Es una reunión con varias personas?** Transcribe con `--words`: deja los
+   tiempos por palabra que necesita la diarización (paso 2b) y cuesta poco. Sin
+   eso, diarizar después obliga a re-transcribir.
+4. **Avisa el tiempo estimado** en videos largos y **lanza la corrida en
    background**: en CPU una hora de audio puede tomar 10-20 minutos. Avisa al
    terminar.
 
@@ -65,7 +71,8 @@ PEP 723 en cada script); si el usuario prefiere su propio entorno,
 `scripts/pyproject.toml` instaladas.
 
 ```bash
-# Diagnóstico: GPU, VRAM libre, CUDA, ffmpeg, dependencias, modelo sugerido
+# Diagnóstico: GPU, VRAM libre, CUDA, ffmpeg, dependencias, modelo sugerido,
+# y si la diarización ya está descargada
 uv run scripts/check_env.py --json
 
 # Transcribir (--model/--device: usar lo que sugiere check_env.py)
@@ -117,6 +124,54 @@ uv run --with nvidia-cublas-cu12 --with "nvidia-cudnn-cu12>=9,<10" \
 
 Si el modelo entra en bucle repitiendo la misma frase (audio con música o
 tramos largos sin voz), reintenta con `--no-condition`.
+
+## Diarización: quién habla (paso 2b)
+
+`nvidia/Nemotron-3-Diarization` (~100M parámetros, hasta **8 hablantes**)
+detecta quién habla y cuándo; no transcribe. Se cruza con la transcripción de
+Whisper palabra a palabra, así que la transcripción tiene que haberse hecho con
+`--words` (genera `<transcripcion>_palabras.jsonl`).
+
+```bash
+uv run scripts/transcribe.py reunion.mp4 --model large-v3-turbo --words ...
+uv run scripts/diarizar.py reunion.mp4 \
+  --palabras "reunion_analisis/reunion_transcripcion_yymmdd_hhmmss_palabras.jsonl"
+```
+
+Genera `<video>_diarizacion.json` (los tramos, se reutiliza) y
+`<transcripcion>_hablantes.txt`, con líneas `[HH:MM:SS.mmm] speaker_N: texto`.
+`speaker_N` es anónimo y se numera por orden de aparición. Al final imprime
+cuánto habló cada uno y sus líneas más largas con timestamp: con eso se les pone
+nombre en el paso 3.
+
+**Primera corrida: pide permiso antes.** Descarga ~3 GB (torch con CUDA,
+transformers desde GitHub y el modelo) a la caché de uv y de Hugging Face.
+`check_env.py` dice si ya está todo (`diarizacion.listo`) y cuánto falta bajar.
+
+Referencia (35 min de reunión, RTX 4060 Laptop): 6 s y ~650 MiB de VRAM en el
+modo por defecto (`offline`, ventana de 30,4 s). Si no hay memoria, cae solo a
+`low_latency`. Más de 8 personas hablando: el modelo no lo soporta, avisa
+antes.
+
+### Nombrar hablantes (dentro del paso 3)
+
+Los nombres reales se resuelven junto con la corrección de términos y quedan
+solo en `_hablantes_corregido.txt`; `_hablantes.txt` no se toca.
+
+1. **Pide la lista de participantes** si no está en `contexto_video.md`, con
+   cualquier pista útil (quién expuso, quién habló más).
+2. **Junta evidencia por hablante**: a partir de las líneas que imprime
+   `diarizar.py`, busca en la transcripción saludos o menciones ("gracias,
+   Robert") y, en Meet/Zoom/Teams, **extrae un frame** en una línea larga de
+   cada `speaker_N` para leer el nombre que la plataforma destaca. Ojo: el
+   destacado llega con ~1 s de retraso y en turnos cortos puede seguir en quien
+   habló antes. Saca el frame a mitad del turno, no al inicio, y no deduzcas
+   un nombre de que *nadie* esté destacado.
+3. **Muestra la tabla de mapeo** (`speaker_N` → nombre, evidencia con
+   timestamp o ruta del frame) y **espera confirmación**. Lo que no se pueda
+   respaldar queda como `speaker_N`.
+4. Con la confirmación, genera `_hablantes_corregido.txt` con nombres y
+   términos corregidos.
 
 ## Transcript vs. frame
 
@@ -175,9 +230,12 @@ tramo): decide según la pregunta, el largo del archivo y el contexto disponible
 
 ## Reglas duras
 
-- **No atribuyas declaraciones a personas.** No hay diarización, así que no se
-  sabe quién habla. Cita con timestamp: "en [00:12:30] se plantea que…". Un acta
-  sin nombres es mejor que un acta con nombres equivocados.
+- **No atribuyas declaraciones a personas** salvo que exista un
+  `_hablantes_corregido.txt` con nombres que el usuario confirmó (paso 3). Un
+  `speaker_N` sin confirmar no es un nombre: cítalo como `speaker_N`. Sin
+  diarización no se sabe quién habla: cita con timestamp, "en [00:12:30] se
+  plantea que…". Un acta sin nombres es mejor que un acta con nombres
+  equivocados.
 
   **Excepción — Meet, Zoom, Teams:** suelen destacar en pantalla a quien está
   hablando (nombre al pie, recuadro resaltado). Ahí sí puedes atribuir, extrayendo
@@ -210,6 +268,10 @@ reunion.mp4
 reunion_analisis/
 ├── reunion_transcripcion_yymmdd_hhmmss.txt
 ├── reunion_transcripcion_yymmdd_hhmmss_corregido.txt
+├── reunion_transcripcion_yymmdd_hhmmss_palabras.jsonl     # con --words
+├── reunion_transcripcion_yymmdd_hhmmss_hablantes.txt      # diarizar.py
+├── reunion_transcripcion_yymmdd_hhmmss_hablantes_corregido.txt
+├── reunion_diarizacion.json                 # caché de diarizar.py
 ├── reunion_resumen_yymmdd_hhmmss.md
 ├── reunion_indice_yymmdd_hhmmss.md
 ├── reunion_audio.m4a                        # caché, se reutiliza
@@ -221,7 +283,8 @@ El timestamp en el nombre evita que una corrida pise a la anterior. Los scripts
 crean la carpeta solos; los resúmenes que escribas tú van ahí también.
 
 Formato del transcript: header `[modelo | idioma | yy-mm-dd hh:mm:ss]` y después
-un segmento por línea, `[HH:MM:SS.mmm] texto`.
+un segmento por línea, `[HH:MM:SS.mmm] texto`. En `_hablantes*.txt`:
+`[HH:MM:SS.mmm] speaker_N: texto` (o el nombre, en el corregido).
 
 ## Referencias
 

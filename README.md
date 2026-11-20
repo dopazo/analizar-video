@@ -8,7 +8,7 @@ archivo a ningún lado.
 Pensada para reuniones internas, levantamientos de requerimientos con clientes y
 walkthroughs de procesos.
 
-Son cuatro scripts de Python sin estado y un archivo de instrucciones. Los
+Son cinco scripts de Python sin estado y un archivo de instrucciones. Los
 scripts los puede invocar cualquier agente —o tú a mano—; el archivo de
 instrucciones le enseña al agente cuándo y cómo usarlos.
 
@@ -78,6 +78,20 @@ siglas: en una charla técnica de 34 minutos, "Claude" salió 18 veces como
 hacerte releer todo. El `.txt` original nunca se toca: la versión corregida se
 escribe aparte.
 
+**Quién dijo qué.** En reuniones, `diarizar.py` usa
+[Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization)
+para detectar quién habla y cuándo (hasta 8 personas), y lo cruza palabra a
+palabra con la transcripción:
+
+```
+[00:35:01.210] speaker_3: perfecto muchas gracias Robert, me queda todo claro
+[00:35:09.670] speaker_4: yo también, ¿te quedó claro, Jhon?
+```
+
+Los `speaker_N` son anónimos. El agente propone a quién corresponde cada uno
+con evidencia (menciones en el texto, el recuadro que Teams/Meet/Zoom destaca en
+el frame) y tú confirmas antes de que aparezca un nombre real.
+
 **Re-transcribir solo un tramo dudoso.** Cuando una frase queda incomprensible,
 se vuelve a pasar ese pedazo por un modelo mejor con un glosario apuntado.
 Cortar 20 segundos de un archivo de 30 GB toma menos de un segundo.
@@ -98,6 +112,10 @@ reunion.mp4
 reunion_analisis/
 ├── reunion_transcripcion_yymmdd_hhmmss.txt
 ├── reunion_transcripcion_yymmdd_hhmmss_corregido.txt
+├── reunion_transcripcion_yymmdd_hhmmss_palabras.jsonl     # tiempos por palabra
+├── reunion_transcripcion_yymmdd_hhmmss_hablantes.txt      # con speaker_N
+├── reunion_transcripcion_yymmdd_hhmmss_hablantes_corregido.txt  # con nombres
+├── reunion_diarizacion.json                 # caché de la diarización
 ├── reunion_resumen_yymmdd_hhmmss.md
 ├── reunion_indice_yymmdd_hhmmss.md
 ├── reunion_audio.m4a                        # caché de audio, se reutiliza
@@ -122,10 +140,12 @@ Plantilla en [`references/formato_contexto.md`](.claude/skills/analizar-video/re
 
 ## Limitaciones
 
-- **No identifica quién habla.** Sin diarización no hay etiquetas de hablante
-  confiables, así que las actas citan con timestamp pero no atribuyen frases a
-  personas. Es deliberado: un acta con nombres equivocados es peor que una sin
-  nombres. Queda como mejora futura.
+- **Quién habla: máximo 8 personas, y los nombres los confirmas tú.** La
+  diarización no conoce a nadie: entrega `speaker_0`, `speaker_1`… y el nombre
+  real se asigna solo con tu confirmación. Los turnos muy cortos (un "sí", un
+  "gracias") son los menos confiables. Sin diarización, las actas citan con
+  timestamp pero no atribuyen frases: un acta con nombres equivocados es peor
+  que una sin nombres.
 - **No descarga desde URLs** (Drive, Meet, YouTube): el archivo tiene que estar
   en disco.
 - **Idioma forzado a español por defecto.** La autodetección de Whisper decide
@@ -163,7 +183,7 @@ descargados y qué nivel conviene según la VRAM libre.
 
 ### Requisitos
 
-- **Python 3.9+**
+- **Python 3.9+** (3.10+ para `diarizar.py`)
 - **[uv](https://docs.astral.sh/uv/)** (recomendado): los scripts declaran sus
   dependencias inline (PEP 723), así que `uv run script.py` las resuelve solo,
   sin instalar nada global. Si prefieres tu propio entorno, instala las
@@ -171,6 +191,10 @@ descargados y qué nivel conviene según la VRAM libre.
 - **ffmpeg** en el PATH — para frames, recortes de tramo y caché de audio. La
   transcripción funciona sin él.
 - **GPU NVIDIA** — opcional. Sin GPU funciona igual, más lento.
+- **Diarización** — opcional. La primera corrida descarga ~3 GB (PyTorch con
+  CUDA, `transformers` desde GitHub porque el modelo aún no está en un release,
+  y el modelo de ~400 MB). En una RTX 4060 Laptop diariza 35 minutos en 6
+  segundos con ~650 MiB de VRAM; en CPU no está probado.
 
 ## Detalles técnicos
 
@@ -253,6 +277,10 @@ uv run $SKILL/scripts/transcribe.py reunion.mp4 --model large-v3-turbo
 uv run $SKILL/scripts/transcribe.py ./sesiones/            # batch secuencial
 uv run $SKILL/scripts/extract_frame.py reunion.mp4 --at 00:12:34
 
+# Quién habla: transcribir con --words y luego diarizar
+uv run $SKILL/scripts/transcribe.py reunion.mp4 --words
+uv run $SKILL/scripts/diarizar.py reunion.mp4   --palabras reunion_analisis/reunion_transcripcion_*_palabras.jsonl
+
 # Candidatos a término mal transcrito
 uv run $SKILL/scripts/revisar_terminos.py reunion_transcripcion_*.txt
 
@@ -277,6 +305,7 @@ analizar-video/                        # el repo
     │   ├── extract_frame.py
     │   ├── check_env.py
     │   ├── revisar_terminos.py
+    │   ├── diarizar.py                # quién habla (Nemotron)
     │   ├── _comun.py                  # piezas compartidas, solo stdlib
     │   └── pyproject.toml
     └── references/
@@ -287,3 +316,5 @@ analizar-video/                        # el repo
 
 Transcripción vía [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
 (SYSTRAN, MIT) sobre CTranslate2.
+Diarización vía [Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization)
+(NVIDIA, OpenMDW-1.1) sobre 🤗 Transformers.

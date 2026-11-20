@@ -20,8 +20,11 @@ import shutil
 import subprocess
 import sys
 
+from pathlib import Path
+
 from _comun import (
-    MODEL_SIZES_MB, correr, dirs_site_packages, escanear_modelos, hf_cache_dir,
+    DIAR_DESCARGA_GB, DIAR_MODELO_MB, MODEL_SIZES_MB, correr, dirs_site_packages,
+    escanear_modelos, hf_cache_dir, modelo_diarizacion_mb,
 )
 
 PY_DEPS = {
@@ -42,6 +45,9 @@ VRAM_TIERS = [
 ]
 
 CPU_FALLBACK = ("small", "int8")
+
+# Medido: ~650 MiB de pico diarizando 35 min en modo offline. Con margen.
+DIAR_VRAM_MIB = 1000
 
 
 def modelos_locales() -> dict:
@@ -118,6 +124,43 @@ def cuda_libs_present() -> bool | None:
     return False
 
 
+def torch_de_diarizacion() -> str | None:
+    """Version de torch del entorno que uv armo para diarizar.py, si existe.
+
+    Es la parte pesada de la primera corrida (~2,6 GB). uv guarda el entorno
+    de cada script en <cache>/environments-v2/<script>-<hash>/.
+    """
+    out = correr(["uv", "cache", "dir"], timeout=20) if shutil.which("uv") else None
+    if not out or not out.strip():
+        return None
+    envs = Path(out.strip()) / "environments-v2"
+    if not envs.is_dir():
+        return None
+    for env in envs.glob("diarizar-*"):
+        for info in env.glob("*/**/site-packages/torch-*.dist-info"):
+            return info.name[len("torch-"):-len(".dist-info")]
+    return None
+
+
+def diarizacion(gpu: dict) -> dict:
+    mb = modelo_diarizacion_mb()
+    torch_v = torch_de_diarizacion()
+    libre = gpu["vram_free_mib"]
+    if gpu["available"] and (libre is None or libre >= DIAR_VRAM_MIB):
+        device = "cuda"
+    else:
+        device = "cpu"
+    return {
+        "modelo_mb": mb,
+        "torch": torch_v,
+        "listo": mb is not None and torch_v is not None,
+        "device": device,
+        "descarga_pendiente_gb": (0 if mb is not None and torch_v is not None
+                                  else DIAR_MODELO_MB / 1000 if torch_v
+                                  else DIAR_DESCARGA_GB),
+    }
+
+
 def python_deps() -> dict:
     return {pkg: importlib.util.find_spec(mod) is not None
             for mod, pkg in PY_DEPS.items()}
@@ -190,6 +233,7 @@ def collect() -> dict:
         "python_deps": deps,
         "suggested": suggest(gpu, cuda_libs, descargados),
         "modelos": modelos,
+        "diarizacion": diarizacion(gpu),
         "gpu_enable_hint": None,
         "warnings": [],
         "missing": [],
@@ -275,6 +319,20 @@ def print_human(r: dict) -> None:
     if m["faltantes"]:
         pend = ", ".join(f"{n} (~{MODEL_SIZES_MB[n]} MB)" for n in m["faltantes"])
         print(f"  Sin descargar: {pend}")
+
+    dz = r["diarizacion"]
+    print("")
+    print("--- Diarizacion (quien habla, opcional) ---")
+    print("  Modelo : " + (f"descargado ({dz['modelo_mb']} MB)" if dz["modelo_mb"]
+                           else f"sin descargar (~{DIAR_MODELO_MB} MB)"))
+    print("  torch  : " + (dz["torch"] or "sin instalar (~2,6 GB, entorno de uv)"))
+    if dz["listo"]:
+        print(f"  Listo; correria en {dz['device']}.")
+    else:
+        print(f"  La primera corrida de diarizar.py descarga ~{dz['descarga_pendiente_gb']:g} GB: "
+              "pedir permiso antes.")
+    if dz["device"] == "cpu":
+        print("  Sin GPU utilizable: correria en CPU (no probado, mas lento).")
 
     s = r["suggested"]
     print("")

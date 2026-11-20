@@ -666,8 +666,8 @@ video::cue { color: transparent; background: transparent; text-shadow: none; }
 }
 
 .atajos-flotantes {
-  position: fixed; left: 18px; bottom: 22px; z-index: 65;
-  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  position: fixed; right: 18px; bottom: 22px; z-index: 65;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
   font-family: var(--fuente); color: var(--texto);
 }
 .atajos-pastilla {

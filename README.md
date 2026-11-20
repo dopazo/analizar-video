@@ -14,18 +14,37 @@ instrucciones le enseña al agente cuándo y cómo usarlos.
 
 ## Instalar
 
-Párate en la carpeta donde quieras la skill —`~/.claude/skills/` para tenerla en
-todos tus proyectos— y descárgala sin clonar el repo:
+Descarga la skill sin clonar el repo. Los comandos cambian según el sistema:
+elige el bloque del tuyo. Lo deja en `~/.claude/skills/analizar-video/`, disponible para Claude
+Code en todos tus proyectos.
+
+**Windows (PowerShell)**
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null; Set-Location "$HOME\.claude\skills"
+curl.exe -sLo analizar-video.tar.gz https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz
+tar -xzf analizar-video.tar.gz --strip-components=3 analizar-video-main/.claude/skills/analizar-video; Remove-Item analizar-video.tar.gz
+```
+
+Es `curl.exe` y no `curl` (en PowerShell, `curl` a secas es otro comando), y
+baja a un archivo en vez de usar `|`, porque PowerShell 5 altera los datos
+binarios que pasan por un pipe. `curl.exe` y `tar` vienen con Windows 10 y 11.
+
+**macOS y Linux (Terminal)**
 
 ```bash
+mkdir -p ~/.claude/skills && cd ~/.claude/skills
 curl -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz | tar -xz --strip-components=3 analizar-video-main/.claude/skills/analizar-video
 ```
 
-En PowerShell es el mismo comando, con `curl.exe` en vez de `curl` (`curl` a
-secas es un alias de `Invoke-WebRequest` y rompe el pipe).
+En cualquiera de los dos queda una carpeta `analizar-video/` con `SKILL.md`
+adentro. **Para actualizar**, borra esa carpeta y repite el comando. Para usarla
+en un solo proyecto, haz lo mismo dentro de `<tu-proyecto>/.claude/skills/` en
+vez de `~/.claude/skills/`.
 
-Requiere [uv](https://docs.astral.sh/uv/) y `ffmpeg`; el detalle está en
-[Requisitos](#requisitos).
+Después instala lo que pide: [uv](https://docs.astral.sh/uv/) y `ffmpeg` (git
+solo si vas a diarizar). El detalle por sistema, y sin permisos de
+administrador, está en [Requisitos](#requisitos).
 
 ## Qué puedes pedirle
 
@@ -200,23 +219,57 @@ Los ejemplos de este README usan `.claude/skills/analizar-video/` como ruta.
 uv run ~/.claude/skills/analizar-video/scripts/check_env.py
 ```
 
-Te dice si falta `ffmpeg`, si hay GPU NVIDIA utilizable, qué modelos tienes
-descargados y qué nivel conviene según la VRAM libre.
+Te dice si falta `ffmpeg` (o `git`, para diarizar), si hay GPU NVIDIA
+utilizable, qué modelos tienes descargados y qué nivel conviene según la VRAM
+libre.
 
 ### Requisitos
 
-- **Python 3.9+** (3.11+ para `diarizar.py`)
+- **Python 3.9+** (3.11+ para `diarizar.py`). Si no lo tienes, `uv python
+  install` lo deja en tu carpeta de usuario.
 - **[uv](https://docs.astral.sh/uv/)** (recomendado): los scripts declaran sus
   dependencias inline (PEP 723), así que `uv run script.py` las resuelve solo,
   sin instalar nada global. Si prefieres tu propio entorno, instala las
   dependencias del `pyproject.toml` de la skill y usa `python script.py`.
-- **ffmpeg** en el PATH — para frames, recortes de tramo y caché de audio. La
-  transcripción funciona sin él.
-- **GPU NVIDIA** — opcional. Sin GPU funciona igual, más lento.
-- **Diarización** — opcional. La primera corrida descarga ~3 GB (PyTorch con
-  CUDA, `transformers` desde GitHub porque el modelo aún no está en un release,
-  y el modelo de ~400 MB). En una RTX 4060 Laptop diariza 35 minutos en 6
-  segundos con ~650 MiB de VRAM; en CPU no está probado.
+- **ffmpeg** en el PATH (trae `ffprobe`): para frames, recortes de tramo y caché
+  de audio, y en el visor para las miniaturas de la barra, la duración de los
+  capítulos y convertir `.mkv`/`.avi` a algo que el navegador reproduzca. La
+  transcripción funciona sin él, y el visor abre igual, pero sin esas partes.
+- **GPU NVIDIA**: opcional. Sin GPU funciona todo igual, en CPU y más lento
+  (`check_env.py` sugiere `small` con int8). Ver "GPU: cuBLAS y cuDNN" abajo.
+- **Diarización**: opcional.
+  - La primera corrida descarga ~3 GB: PyTorch con CUDA, `transformers` y el
+    modelo de ~400 MB.
+  - Necesita **git**: el soporte del modelo todavía no sale en una versión de
+    `transformers` en PyPI, así que `uv` la instala desde GitHub, y para
+    clonarla usa el `git` del equipo. Sin git falla con *Git executable not
+    found*. Solo hace falta la primera vez; nada más de la skill lo usa.
+  - En una RTX 4060 Laptop diariza 35 minutos en 6 segundos con ~650 MiB de
+    VRAM; en CPU no está probado.
+- **Navegador** para el visor: cualquiera sirve. Para que abra en una ventana
+  propia, sin pestañas, uno basado en Chromium (Edge, Chrome o Brave; en
+  Windows, Edge ya viene instalado). Sin ninguno, abre una pestaña normal.
+
+**Cómo instalarlos**, según el sistema:
+
+| | Windows (PowerShell) | macOS | Linux (Debian/Ubuntu) |
+|---|---|---|---|
+| uv | `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 \| iex"` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| ffmpeg | `winget install --id Gyan.FFmpeg -e` | `brew install ffmpeg` | `sudo apt install ffmpeg` |
+| git (solo para diarizar) | `winget install --id Git.Git -e` | `xcode-select --install` | `sudo apt install git` |
+
+El instalador de uv no pide permisos de administrador. `winget` a veces sí:
+si no los tienes, mira la alternativa más abajo.
+
+**No hace falta:**
+- **Node.js**: el visor viaja ya compilado dentro de la skill. Solo se usa para
+  modificar su interfaz (`visor-ui/`).
+- **Permisos de administrador**: uv, Python, ffmpeg y git se pueden instalar en
+  tu carpeta de usuario. Para ffmpeg, el zip ya compilado descomprimido en una
+  carpeta propia y agregada al PATH de usuario; para git, PortableGit.
+- **Cuentas o servicios externos**: todo corre en local.
+
+`check_env.py` revisa todo esto y dice qué falta.
 
 ## Detalles técnicos
 

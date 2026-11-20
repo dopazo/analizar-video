@@ -374,6 +374,7 @@ export default function App() {
               consulta={consultaDiferida}
               actual={actual}
               onResultados={setTotalDoc}
+              pedirSeguir={pedirSeguir}
             />
           ) : (
           <Transcripcion

@@ -64,11 +64,19 @@ export default function App() {
     [datos, lineas],
   );
   const consultaDiferida = useDeferredValue(consulta);
-  const coincidencias = useMemo(() => buscar(lineas, consultaDiferida), [lineas, consultaDiferida]);
+  // El buscador busca en la pestaña abierta: en la transcripción, por líneas
+  // (y salta el video); en resumen, índice o notas, dentro del documento.
+  const enTranscripcion = !datos?.documentos?.some((d) => d.tipo === pestana);
+  const coincidencias = useMemo(
+    () => (enTranscripcion ? buscar(lineas, consultaDiferida) : []),
+    [lineas, consultaDiferida, enTranscripcion],
+  );
+  const [totalDoc, setTotalDoc] = useState(0);
+  const totalBusqueda = enTranscripcion ? coincidencias.length : totalDoc;
   useEffect(() => {
     setActual(0);
     setVisitado(false);
-  }, [coincidencias]);
+  }, [coincidencias, totalDoc, pestana]);
 
   const lineaActiva = useSincronia(mediaRef, lineas, listaRef);
 
@@ -148,10 +156,7 @@ export default function App() {
     if (buscarFlotante) buscadorFlotante.current?.focus();
   }, [buscarFlotante]);
 
-  const cambiarConsulta = useCallback((q: string) => {
-    setConsulta(q);
-    setPestana("transcripcion"); // la búsqueda es sobre lo que se dijo
-  }, []);
+  const cambiarConsulta = useCallback((q: string) => setConsulta(q), []);
   const cerrarBusqueda = useCallback(() => {
     setConsulta("");
     setBuscarFlotante(false);
@@ -161,13 +166,14 @@ export default function App() {
 
   const moverResultado = useCallback(
     (paso: number) => {
-      if (!coincidencias.length) return;
-      const n = visitado ? (actual + paso + coincidencias.length) % coincidencias.length : actual;
+      if (!totalBusqueda) return;
+      const n = visitado ? (actual + paso + totalBusqueda) % totalBusqueda : actual;
       setVisitado(true);
       setActual(n);
-      saltar(lineas[coincidencias[n].linea].start);
+      // En la transcripción el resultado es un momento del video; en un documento, solo se lee.
+      if (enTranscripcion) saltar(lineas[coincidencias[n].linea].start);
     },
-    [actual, visitado, coincidencias, lineas, saltar],
+    [actual, visitado, totalBusqueda, enTranscripcion, coincidencias, lineas, saltar],
   );
 
   // Lo que el manejador de teclas necesita leer sin volver a registrarse.
@@ -224,6 +230,10 @@ export default function App() {
         setPedirSeguir((n) => n + 1);
       } else if (k === "m") {
         el.muted = !el.muted;
+      } else if (k === "p" && el instanceof HTMLVideoElement) {
+        // Video en miniatura (picture-in-picture): sigue a la vista mientras se lee.
+        if (document.pictureInPictureElement) void document.exitPictureInPicture().catch(() => {});
+        else void el.requestPictureInPicture?.().catch(() => {});
       } else if (k === "c") {
         // Subtítulos desde la transcripción: útiles sobre todo en pantalla completa.
         const pista = [...el.textTracks].find((t) => t.kind === "captions");
@@ -305,7 +315,8 @@ export default function App() {
             inputRef={buscador}
             consulta={consulta}
             setConsulta={cambiarConsulta}
-            total={coincidencias.length}
+            total={totalBusqueda}
+            donde={DONDE[docActivo?.tipo ?? ""] ?? "lo que se dijo"}
             actual={actual}
             mover={moverResultado}
             onEscape={cerrarBusqueda}
@@ -354,7 +365,17 @@ export default function App() {
           aria-label="Transcripción y documentos"
         >
           {docActivo ? (
-            <Documento doc={docActivo} mediaRef={mediaRef} onSaltar={saltar} pestanas={pestanas} acciones={botonPanel} />
+            <Documento
+              doc={docActivo}
+              mediaRef={mediaRef}
+              onSaltar={saltar}
+              pestanas={pestanas}
+              acciones={botonPanel}
+              consulta={consultaDiferida}
+              actual={actual}
+              onResultados={setTotalDoc}
+              pedirSeguir={pedirSeguir}
+            />
           ) : (
           <Transcripcion
             pestanas={pestanas}
@@ -395,7 +416,8 @@ export default function App() {
             inputRef={buscadorFlotante}
             consulta={consulta}
             setConsulta={cambiarConsulta}
-            total={coincidencias.length}
+            total={totalBusqueda}
+            donde={DONDE[docActivo?.tipo ?? ""] ?? "lo que se dijo"}
             actual={actual}
             mover={moverResultado}
             onEscape={cerrarBusqueda}
@@ -408,6 +430,8 @@ export default function App() {
     </div>
   );
 }
+
+const DONDE: Record<string, string> = { resumen: "el resumen", indice: "el índice", notas: "las notas" };
 
 function Marca() {
   return (

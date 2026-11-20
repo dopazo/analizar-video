@@ -46,3 +46,4 @@ uv.lock
 
 # --- UI del visor ---
 node_modules/
+*.tsbuildinfo

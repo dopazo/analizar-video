@@ -128,6 +128,12 @@ export function Transcripcion({
     if (!programatico.current) setSiguiendo(false);
   };
 
+  const volver = () => {
+    setSiguiendo(true);
+    irA(lineaActiva);
+  };
+  const puedeVolver = !siguiendo && lineaActiva >= 0;
+
   if (!lineas.length) {
     return (
       <div className="transcripcion">
@@ -146,6 +152,12 @@ export function Transcripcion({
       <div className="panel-cabecera">
         {pestanas}
         <div className="cabecera-derecha">
+          {puedeVolver && !coincidencias.length && (
+            <button className="boton-seguir" onClick={volver} title="Seguir el video (.)">
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 3h-2.07A7 7 0 0 0 13 5.07V3h-2v2.07A7 7 0 0 0 5.07 11H3v2h2.07A7 7 0 0 0 11 18.93V21h2v-2.07A7 7 0 0 0 18.93 13H21v-2Zm-9 6a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z"/></svg>
+              <span>Seguir</span>
+            </button>
+          )}
           <span className={`estado-seguir${siguiendo && !coincidencias.length ? " on" : ""}`}>
             <i />
             {coincidencias.length ? `${coincidencias.length} resultados` : siguiendo ? "Siguiendo el video" : "Lectura libre"}
@@ -183,14 +195,8 @@ export function Transcripcion({
           </div>
         </div>
       </div>
-      {!siguiendo && lineaActiva >= 0 && (
-        <button
-          className="volver"
-          onClick={() => {
-            setSiguiendo(true);
-            irA(lineaActiva);
-          }}
-        >
+      {puedeVolver && (
+        <button className="volver" onClick={volver}>
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 3h-2.07A7 7 0 0 0 13 5.07V3h-2v2.07A7 7 0 0 0 5.07 11H3v2h2.07A7 7 0 0 0 11 18.93V21h2v-2.07A7 7 0 0 0 18.93 13H21v-2Zm-9 6a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z"/></svg>
           Volver a lo que está sonando
         </button>

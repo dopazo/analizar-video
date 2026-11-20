@@ -378,6 +378,12 @@ kbd {
 .estado-seguir i { width: 6px; height: 6px; border-radius: 50%; background: var(--borde-fuerte); }
 .estado-seguir.on { color: var(--texto-2); }
 .estado-seguir.on i { background: var(--h3); }
+.boton-seguir {
+  display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px 0 8px; border-radius: 999px;
+  border: 1px solid var(--borde-fuerte); background: transparent; color: var(--texto-2); font: inherit; font-size: 12px;
+  cursor: pointer; white-space: nowrap; transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+.boton-seguir:hover { background: var(--activo); color: var(--texto); }
 .archivo-doc { font-family: var(--mono); font-size: 11px; color: var(--tenue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
 /* ---------- transcripción ---------- */
@@ -600,6 +606,18 @@ video::cue { color: transparent; background: transparent; text-shadow: none; }
 .panel-cabecera .pestanas { flex: none; }
 .cabecera-derecha { flex: 0 1 auto; justify-content: flex-end; }
 .cabecera-derecha .estado-seguir, .cabecera-derecha .archivo-doc { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.boton-seguir { flex: none; }
+/* Panel angosto: primero se esconde el texto del estado (queda el punto) y
+   después el del botón (queda el ícono), para que nada pise las pestañas. */
+.panel-cabecera { container-type: inline-size; }
+@container (max-width: 560px) {
+  .estado-seguir { font-size: 0; gap: 0; }
+  .pestanas { gap: 14px; }
+}
+@container (max-width: 440px) {
+  .boton-seguir { padding: 0; width: 26px; justify-content: center; }
+  .boton-seguir span { display: none; }
+}
 
 /* ---------- flotantes: nota, aviso, buscador, atajos ---------- */
 /* Se montan dentro del elemento en pantalla completa cuando lo hay, por eso
@@ -710,3 +728,9 @@ media-controller > .atajos-flotantes, media-controller > .buscador-flotante {
 }
 media-controller > .buscador-flotante { top: 16px; bottom: auto; }
 media-controller > .atajos-flotantes { top: 18px; bottom: auto; flex-direction: column-reverse; }
+
+/* Resultados de búsqueda dentro de resumen, índice y notas */
+mark.hit-doc { background: var(--hit); color: inherit; border-radius: 2px; box-shadow: 0 0 0 1.5px var(--hit); }
+mark.hit-doc.hit-actual { background: var(--hit-actual); box-shadow: 0 0 0 1.5px var(--hit-actual); }
+/* En pantalla completa del panel, sobre la barra flotante de controles */
+.columna-texto.panel-completo .volver { bottom: 100px; }

@@ -105,25 +105,34 @@ export default function App() {
   }, []);
 
   if (error) {
-    return <div className="estado">No pude cargar los datos del visor ({error}). ¿Sigue corriendo visor.py?</div>;
+    return (
+      <div className="estado">
+        <div className="estado-tarjeta">
+          <strong>No pude cargar los datos del visor</strong>
+          <span>{error} · ¿sigue corriendo visor.py?</span>
+        </div>
+      </div>
+    );
   }
-  if (!datos) return <div className="estado"><span className="girador" /> Cargando…</div>;
+  if (!datos) return <Esqueleto />;
 
   const t = datos.transcripcion;
   const modelo = t?.header.replace(/^\[|\]$/g, "").split("|")[0]?.trim();
 
   return (
     <div className="app">
+      <div className="fondo" aria-hidden />
       <header className="cabecera">
+        <Marca />
         <div className="titulo">
           <h1 title={datos.video.nombre}>{datos.video.nombre}</h1>
           {t && (
-            <p className="meta">
-              {t.lineas.length} líneas
-              {datos.hablantes.length > 0 && ` · ${datos.hablantes.length} hablantes`}
-              {modelo && ` · ${modelo}`}
-              {t.palabras ? " · palabra a palabra" : ""}
-            </p>
+            <div className="meta">
+              <span className="insignia">{t.lineas.length} líneas</span>
+              {datos.hablantes.length > 0 && <span className="insignia">{datos.hablantes.length} hablantes</span>}
+              {modelo && <span className="insignia insignia-modelo">{modelo}</span>}
+              {t.palabras && <span className="insignia insignia-acento">palabra a palabra</span>}
+            </div>
           )}
         </div>
         {t && (
@@ -180,10 +189,11 @@ export default function App() {
                 actual={actual}
                 mediaRef={mediaRef}
                 onSaltar={saltar}
+                lineaActiva={lineaActiva}
               />
             }
           />
-          <Leyenda hablantes={datos.hablantes} />
+          <Leyenda lineas={lineas} hablantes={datos.hablantes} lineaActiva={lineaActiva} />
           <p className="atajos">
             <kbd>Espacio</kbd> reproducir · <kbd>J</kbd>/<kbd>L</kbd> ±10 s · <kbd>←</kbd>/<kbd>→</kbd> ±5 s ·{" "}
             <kbd>/</kbd> buscar · <kbd>.</kbd> volver a lo que suena · clic en una palabra para saltar
@@ -200,6 +210,44 @@ export default function App() {
             onSaltar={saltar}
             pedirSeguir={pedirSeguir}
           />
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function Marca() {
+  return (
+    <div className="marca" aria-hidden>
+      <svg viewBox="0 0 24 24" width="20" height="20">
+        <path fill="currentColor" d="M8 6.5v11a1 1 0 0 0 1.52.85l8.5-5.5a1 1 0 0 0 0-1.7l-8.5-5.5A1 1 0 0 0 8 6.5Z" />
+      </svg>
+    </div>
+  );
+}
+
+/** Mientras llegan los datos: la silueta de la página, sin saltos al cargar. */
+function Esqueleto() {
+  return (
+    <div className="app">
+      <div className="fondo" aria-hidden />
+      <header className="cabecera">
+        <Marca />
+        <div className="titulo">
+          <div className="hueso" style={{ width: 220, height: 16 }} />
+          <div className="hueso" style={{ width: 300, height: 12, marginTop: 8 }} />
+        </div>
+      </header>
+      <main className="cuerpo">
+        <section className="columna-video">
+          <div className="hueso hueso-video" />
+        </section>
+        <section className="columna-texto">
+          <div className="esqueleto-lista">
+            {Array.from({ length: 7 }, (_, i) => (
+              <div key={i} className="hueso" style={{ height: 14, width: `${60 + ((i * 37) % 35)}%` }} />
+            ))}
+          </div>
         </section>
       </main>
     </div>

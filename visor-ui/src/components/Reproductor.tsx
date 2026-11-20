@@ -1,4 +1,5 @@
-import type { ReactNode, RefObject } from "react";
+import { useRef, type ReactNode, type RefObject } from "react";
+import { useAmbiente } from "../lib/ambiente";
 import {
   MediaController,
   MediaControlBar,
@@ -51,7 +52,11 @@ function Botones({ audio, externo }: { audio: boolean; externo: boolean }) {
 }
 
 export function Reproductor({ url, nombre, audio, mediaRef, bajoSlider }: Props) {
+  const lienzo = useRef<HTMLCanvasElement>(null);
+  useAmbiente(mediaRef, lienzo, !audio);
   return (
+    <div className="escenario">
+      {!audio && <canvas ref={lienzo} className="ambiente" width={32} height={18} aria-hidden />}
     <div className="reproductor-bloque">
       <MediaController id={ID} className={audio ? "reproductor solo-audio" : "reproductor"} audio={audio || undefined}>
         {audio ? (
@@ -87,6 +92,7 @@ export function Reproductor({ url, nombre, audio, mediaRef, bajoSlider }: Props)
           <Botones audio={audio} externo />
         </MediaControlBar>
       </div>
+    </div>
     </div>
   );
 }

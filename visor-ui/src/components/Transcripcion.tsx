@@ -2,6 +2,7 @@ import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Coincidencia, LineaUI } from "../tipos";
 import { colorHablante, fmt } from "../lib/util";
+import { Avatar } from "./MapaTiempo";
 
 interface Props {
   lineas: LineaUI[];
@@ -85,6 +86,13 @@ export function Transcripcion({
   const items = virt.getVirtualItems();
   return (
     <div className="transcripcion">
+      <div className="panel-cabecera">
+        <h2>Transcripción</h2>
+        <span className={`estado-seguir${siguiendo && !coincidencias.length ? " on" : ""}`}>
+          <i />
+          {coincidencias.length ? `${coincidencias.length} resultados` : siguiendo ? "Siguiendo el video" : "Lectura libre"}
+        </span>
+      </div>
       <div
         className="lista"
         ref={listaRef}
@@ -162,8 +170,8 @@ const Fila = memo(function Fila({ ln, color, mostrarHablante, activa, hits, onSa
     <div className={`fila h${color}${activa ? " activa" : ""}${mostrarHablante ? " nuevo-turno" : ""}`} data-l={ln.idx}>
       {mostrarHablante && (
         <div className="hablante">
-          <i />
-          {ln.speaker}
+          <Avatar nombre={ln.speaker!} chico />
+          <span>{ln.speaker}</span>
         </div>
       )}
       <div className="fila-cuerpo">

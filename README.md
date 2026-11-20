@@ -96,8 +96,11 @@ el frame) y tú confirmas antes de que aparezca un nombre real.
 navegador un reproductor con la transcripción sincronizada: resalta la palabra
 que se está diciendo, colorea por hablante, muestra en una franja bajo el video
 quién habla a lo largo de la reunión y dónde caen los resultados de una
-búsqueda. Clic en cualquier palabra salta a ese momento. Todo local, sin
-instalar nada más: la interfaz viaja compilada dentro de la skill.
+búsqueda. Clic en cualquier palabra salta a ese momento. Si ya hay resumen o
+índice de temas, aparecen en pestañas al lado de la transcripción y cada
+timestamp que contienen es un enlace a ese momento del video. El agente lo
+ofrece al final, cuando ya está todo escrito. Todo local, sin instalar nada más:
+la interfaz viaja compilada dentro de la skill.
 
 **Re-transcribir solo un tramo dudoso.** Cuando una frase queda incomprensible,
 se vuelve a pasar ese pedazo por un modelo mejor con un glosario apuntado.

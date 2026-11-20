@@ -25,7 +25,7 @@ encadenes pasos por tu cuenta.
 | 4 | **Responder / resumir** | Según lo pedido. Resumir o explicar incluye el **sondeo visual** (ver abajo), no es un paso aparte. Al resumir, mencionar que queda un `.md` en `<video>_analisis/` |
 | 5 | **Índice de temas** | En videos largos, donde navegar el transcript se vuelve incómodo |
 | 6 | **Frames de apoyo** | Si la pregunta toca contenido visual, o si un walkthrough gana con capturas |
-| 7 | **Visor** (`visor.py`) | Cuando ya hay transcripción y el usuario quiere revisar la grabación por su cuenta: video con la transcripción sincronizada al lado |
+| 7 | **Visor** (`visor.py`) | **Al cerrar**: cuando ya se respondió lo que el usuario pedía (y hay resumen o índice, si se pidieron), ofrécelo una vez como último paso. También si pide ver o revisar la grabación |
 
 Reglas para que la guía no sea ruido: **una sugerencia a la vez**; no repetir
 una que el usuario ya declinó en la sesión; la primera vez sobre un video se
@@ -89,11 +89,20 @@ uv run scripts/extract_frame.py reunion.mp4 --at 00:12:34
 uv run scripts/extract_frame.py reunion.mp4 --at 00:12:34 --range 3 --fps 2   # si no alcanzó
 ```
 
-**Visor** (paso 7): video y transcripción sincronizados en el navegador, con
-resaltado palabra a palabra (si se transcribió con `--words`), colores por
-hablante y búsqueda. Toma la transcripción preferida de la corrida más reciente.
+**Visor** (paso 7, el cierre): video y transcripción sincronizados en el
+navegador, con resaltado palabra a palabra (si se transcribió con `--words`),
+colores por hablante y búsqueda. Si existen, el resumen y el índice más
+recientes aparecen como pestañas junto a la transcripción, y cada `[HH:MM:SS]`
+que contengan lleva a ese momento del video; las imágenes que referencien dentro
+de `<video>_analisis/` (los frames) se muestran. Por eso conviene ofrecerlo al
+final, cuando ya está todo escrito:
+
+> ¿Quieres abrirlo en el visor? Video y transcripción sincronizados, con el
+> resumen y el índice en pestañas.
+
 Es un servidor que queda corriendo: lánzalo **en background** y entrégale al
-usuario la URL que imprime.
+usuario la URL que imprime. Si después escribes un resumen o índice nuevo, basta
+con que el usuario recargue la página.
 
 ```bash
 uv run scripts/visor.py reunion.mp4            # abre el navegador
@@ -291,6 +300,7 @@ reunion_analisis/
 ├── reunion_resumen_yymmdd_hhmmss.md
 ├── reunion_indice_yymmdd_hhmmss.md
 ├── reunion_audio.m4a                        # caché, se reutiliza
+├── reunion_visor.mp4                        # solo si el formato no se reproducía en el navegador
 └── frames/
     └── frame_HH-MM-SS.mmm.png
 ```

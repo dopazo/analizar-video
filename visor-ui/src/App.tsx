@@ -5,6 +5,7 @@ import { useSincronia } from "./lib/sincronia";
 import { Reproductor } from "./components/Reproductor";
 import { Leyenda, MapaTiempo } from "./components/MapaTiempo";
 import { Transcripcion } from "./components/Transcripcion";
+import { Documento } from "./components/Documento";
 
 export default function App() {
   const [datos, setDatos] = useState<Datos | null>(null);
@@ -15,6 +16,7 @@ export default function App() {
   // El primer Enter lleva al resultado que ya se muestra; los siguientes avanzan.
   const [visitado, setVisitado] = useState(false);
   const [pedirSeguir, setPedirSeguir] = useState(0);
+  const [pestana, setPestana] = useState<string>("transcripcion");
   const mediaRef = useRef<HTMLVideoElement>(null);
   const listaRef = useRef<HTMLDivElement>(null);
   const buscador = useRef<HTMLInputElement>(null);
@@ -117,6 +119,23 @@ export default function App() {
   if (!datos) return <Esqueleto />;
 
   const t = datos.transcripcion;
+  const docs = datos.documentos ?? [];
+  const docActivo = docs.find((d) => d.tipo === pestana) ?? null;
+  const pestanas = (
+    <div className="pestanas" role="tablist">
+      {[{ tipo: "transcripcion", titulo: "Transcripción" }, ...docs].map((p) => (
+        <button
+          key={p.tipo}
+          role="tab"
+          aria-selected={pestana === p.tipo}
+          className={`pestana${pestana === p.tipo ? " activa" : ""}`}
+          onClick={() => setPestana(p.tipo)}
+        >
+          {p.titulo}
+        </button>
+      ))}
+    </div>
+  );
   const modelo = t?.header.replace(/^\[|\]$/g, "").split("|")[0]?.trim();
 
   return (
@@ -143,7 +162,10 @@ export default function App() {
               type="search"
               placeholder="Buscar en lo que se dijo  ( / )"
               value={consulta}
-              onChange={(e) => setConsulta(e.target.value)}
+              onChange={(e) => {
+                setConsulta(e.target.value);
+                setPestana("transcripcion"); // la búsqueda es sobre lo que se dijo
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -199,8 +221,12 @@ export default function App() {
             <kbd>/</kbd> buscar · <kbd>.</kbd> volver a lo que suena · clic en una palabra para saltar
           </p>
         </section>
-        <section className="columna-texto" aria-label="Transcripción">
+        <section className="columna-texto" aria-label="Transcripción y documentos">
+          {docActivo ? (
+            <Documento doc={docActivo} mediaRef={mediaRef} onSaltar={saltar} pestanas={pestanas} />
+          ) : (
           <Transcripcion
+            pestanas={pestanas}
             lineas={lineas}
             hablantes={datos.hablantes}
             lineaActiva={lineaActiva}
@@ -210,6 +236,7 @@ export default function App() {
             onSaltar={saltar}
             pedirSeguir={pedirSeguir}
           />
+          )}
         </section>
       </main>
     </div>

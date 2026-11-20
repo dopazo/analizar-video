@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Coincidencia, LineaUI } from "../tipos";
 import { colorHablante, fmt } from "../lib/util";
@@ -14,10 +14,11 @@ interface Props {
   onSaltar: (t: number) => void;
   /** se incrementa para pedir "vuelve a seguir al video" desde afuera (tecla .) */
   pedirSeguir: number;
+  pestanas: ReactNode;
 }
 
 export function Transcripcion({
-  lineas, hablantes, lineaActiva, coincidencias, actual, listaRef, onSaltar, pedirSeguir,
+  lineas, hablantes, lineaActiva, coincidencias, actual, listaRef, onSaltar, pedirSeguir, pestanas,
 }: Props) {
   const [siguiendo, setSiguiendo] = useState(true);
   const programatico = useRef(false);
@@ -76,9 +77,12 @@ export function Transcripcion({
 
   if (!lineas.length) {
     return (
-      <div className="transcripcion vacia">
-        <p>No hay transcripción para este video.</p>
-        <p className="tenue">Pídele al agente que lo transcriba y vuelve a abrir el visor.</p>
+      <div className="transcripcion">
+        <div className="panel-cabecera">{pestanas}</div>
+        <div className="vacia">
+          <p>No hay transcripción para este video.</p>
+          <p className="tenue">Pídele al agente que lo transcriba y recarga esta página.</p>
+        </div>
       </div>
     );
   }
@@ -87,7 +91,7 @@ export function Transcripcion({
   return (
     <div className="transcripcion">
       <div className="panel-cabecera">
-        <h2>Transcripción</h2>
+        {pestanas}
         <span className={`estado-seguir${siguiendo && !coincidencias.length ? " on" : ""}`}>
           <i />
           {coincidencias.length ? `${coincidencias.length} resultados` : siguiendo ? "Siguiendo el video" : "Lectura libre"}

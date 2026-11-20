@@ -6,7 +6,8 @@
 Toma la transcripción más reciente de <video>_analisis/ (con la misma
 preferencia que el resto de la skill: _hablantes_corregido > _hablantes >
 _corregido > crudo) y, si existe, el _palabras.jsonl de esa corrida para
-resaltar palabra a palabra.
+resaltar palabra a palabra. El resumen y el índice más recientes, si existen,
+aparecen como pestañas; sus [HH:MM:SS] llevan a ese momento del video.
 
 Solo stdlib. Sirve la UI ya compilada (carpeta visor/ de la skill), el video
 con soporte de Range (sin eso el navegador no puede adelantar) y los datos en
@@ -31,7 +32,7 @@ import sys
 import threading
 import webbrowser
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _comun import AUDIO_EXTS, carpeta_analisis  # noqa: E402
@@ -125,11 +126,30 @@ def asignar_palabras(lineas: list[dict], palabras: list[tuple[float, float, str]
             ln["end"] = round(propias[-1][1], 3)
 
 
+# Documentos que la skill escribe junto a la transcripción y que el visor muestra
+# en pestañas. De cada tipo, el más reciente (el timestamp del nombre ordena).
+DOCUMENTOS = [("resumen", "Resumen"), ("indice", "Índice")]
+IMAGENES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
+
+def leer_documentos(media: Path) -> list[dict]:
+    carpeta = carpeta_analisis(media)
+    docs = []
+    for tipo, titulo in DOCUMENTOS:
+        candidatos = sorted(carpeta.glob(f"{media.stem}_{tipo}_*.md"))
+        if candidatos:
+            f = candidatos[-1]
+            docs.append({"tipo": tipo, "titulo": titulo, "archivo": f.name,
+                         "md": f.read_text(encoding="utf-8")})
+    return docs
+
+
 def armar_datos(media: Path, url_media: str) -> dict:
     elegida = elegir_transcripcion(media)
     datos: dict = {"video": {"nombre": media.name, "url": url_media,
                              "audio": media.suffix.lower() in AUDIO_EXTS},
-                   "transcripcion": None, "hablantes": []}
+                   "transcripcion": None, "hablantes": [],
+                   "documentos": leer_documentos(media)}
     if not elegida:
         return datos
     txt, palabras_path = elegida
@@ -181,9 +201,8 @@ def preparar_media(media: Path) -> Path:
 # --- Servidor --------------------------------------------------------------
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    media: Path
-    datos: dict
-    puerto: int
+    media: Path      # lo que se sirve (puede ser el remux)
+    original: Path   # el video que pidió el usuario: de ahí salen los datos
 
     def log_message(self, fmt, *args):  # silencioso: el navegador pide muchos rangos
         pass
@@ -202,13 +221,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def _servir(self, cuerpo: bool):
         if not self._host_ok():
             return self.send_error(403)
-        ruta = unquote(urlparse(self.path).path)
+        url = urlparse(self.path)
+        ruta = unquote(url.path)
         if ruta == "/api/datos":
-            data = json.dumps(self.datos, ensure_ascii=False).encode("utf-8")
+            # Se arma en cada carga: un resumen o índice escrito con el visor
+            # abierto aparece al recargar la página.
+            datos = armar_datos(self.original, "media")
+            data = json.dumps(datos, ensure_ascii=False).encode("utf-8")
             return self._enviar(200, "application/json; charset=utf-8", data, cuerpo)
         if ruta == "/media":
             return self._servir_media(cuerpo)
+        if ruta == "/analisis":
+            return self._servir_imagen(parse_qs(url.query).get("ruta", [""])[0], cuerpo)
         return self._servir_ui(ruta, cuerpo)
+
+    def _servir_imagen(self, pedida: str, cuerpo: bool):
+        """Frames que un resumen referencia. Solo imágenes dentro de <video>_analisis/."""
+        carpeta = carpeta_analisis(self.original).resolve()
+        p = Path(pedida)
+        destino = (p if p.is_absolute() else carpeta / p).resolve()
+        if (carpeta not in destino.parents or destino.suffix.lower() not in IMAGENES
+                or not destino.is_file()):
+            return self.send_error(404)
+        tipo = mimetypes.guess_type(destino.name)[0] or "application/octet-stream"
+        self._enviar(200, tipo, destino.read_bytes(), cuerpo)
 
     def _enviar(self, code: int, tipo: str, data: bytes, cuerpo: bool, extra=None):
         self.send_response(code)
@@ -302,14 +338,17 @@ def main() -> int:
         return 2
 
     Handler.media = preparar_media(media)
-    Handler.datos = armar_datos(media, "/media")
-    t = Handler.datos["transcripcion"]
+    Handler.original = media
+    datos = armar_datos(media, "media")
+    t = datos["transcripcion"]
     if t:
         log(f"Transcripcion: {t['archivo']} ({len(t['lineas'])} lineas"
             f"{', palabra a palabra' if t['palabras'] else ''})")
     else:
         log("AVISO: no hay transcripcion en "
             f"{carpeta_analisis(media).name}/; el visor mostrara solo el video.")
+    for d in datos["documentos"]:
+        log(f"{d['titulo']}: {d['archivo']}")
 
     srv = None
     for puerto in range(args.port, args.port + 20):

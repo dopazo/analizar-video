@@ -18,6 +18,14 @@ export interface Datos {
     lineas: Linea[];
   } | null;
   hablantes: string[];
+  documentos: Documento[];
+}
+
+export interface Documento {
+  tipo: "resumen" | "indice";
+  titulo: string;
+  archivo: string;
+  md: string;
 }
 
 /** Una línea ya preparada para pintar y buscar. */

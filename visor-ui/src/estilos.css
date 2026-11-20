@@ -378,6 +378,12 @@ kbd {
 .estado-seguir i { width: 6px; height: 6px; border-radius: 50%; background: var(--borde-fuerte); }
 .estado-seguir.on { color: var(--texto-2); }
 .estado-seguir.on i { background: var(--h3); }
+.boton-seguir {
+  display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px 0 8px; border-radius: 999px;
+  border: 1px solid var(--borde-fuerte); background: transparent; color: var(--texto-2); font: inherit; font-size: 12px;
+  cursor: pointer; white-space: nowrap; transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+.boton-seguir:hover { background: var(--activo); color: var(--texto); }
 .archivo-doc { font-family: var(--mono); font-size: 11px; color: var(--tenue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
 /* ---------- transcripción ---------- */

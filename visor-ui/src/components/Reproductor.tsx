@@ -1,4 +1,4 @@
-import { useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useAmbiente } from "../lib/ambiente";
 import {
   MediaController,
@@ -24,6 +24,29 @@ interface Props {
   mediaRef: RefObject<HTMLVideoElement | null>;
   /** lo que va pegado bajo el slider, con su mismo ancho (la franja de hablantes) */
   bajoSlider?: ReactNode;
+  capitulos: number;
+  miniaturas: boolean;
+}
+
+/**
+ * Las miniaturas se generan en segundo plano la primera vez. Si aún no están,
+ * se pregunta cada pocos segundos y la pista se agrega apenas existan.
+ */
+function useMiniaturas(inicial: boolean, activo: boolean): boolean {
+  const [listas, setListas] = useState(inicial);
+  useEffect(() => {
+    if (listas || !activo) return;
+    const id = window.setInterval(async () => {
+      try {
+        const r = await fetch("api/estado");
+        if (r.ok && (await r.json()).miniaturas) setListas(true);
+      } catch {
+        /* servidor cerrado: el aviso de presencia ya lo dice */
+      }
+    }, 3000);
+    return () => window.clearInterval(id);
+  }, [listas, activo]);
+  return listas;
 }
 
 const ID = "reproductor";
@@ -51,8 +74,9 @@ function Botones({ audio, externo }: { audio: boolean; externo: boolean }) {
   );
 }
 
-export function Reproductor({ url, nombre, audio, mediaRef, bajoSlider }: Props) {
+export function Reproductor({ url, nombre, audio, mediaRef, bajoSlider, capitulos, miniaturas }: Props) {
   const lienzo = useRef<HTMLCanvasElement>(null);
+  const miniListas = useMiniaturas(miniaturas, !audio);
   useAmbiente(mediaRef, lienzo, !audio);
   return (
     <div className="escenario">
@@ -68,7 +92,12 @@ export function Reproductor({ url, nombre, audio, mediaRef, bajoSlider }: Props)
             <audio slot="media" src={url} preload="auto" ref={mediaRef as unknown as RefObject<HTMLAudioElement>} />
           </>
         ) : (
-          <video slot="media" src={url} preload="auto" playsInline ref={mediaRef} />
+          <video slot="media" src={url} preload="auto" playsInline ref={mediaRef}>
+            {/* Capítulos del índice: Media Chrome parte la barra en tramos y
+                muestra el título del tramo al pasar el mouse, como YouTube. */}
+            {capitulos > 0 && <track kind="chapters" src="api/capitulos.vtt" srcLang="es" default />}
+            {miniListas && <track kind="metadata" label="thumbnails" src="api/miniaturas.vtt" default />}
+          </video>
         )}
         {!audio && <MediaLoadingIndicator slot="centered-chrome" noAutohide />}
         {/* Solo en pantalla completa: ahí los controles de abajo no se ven. */}

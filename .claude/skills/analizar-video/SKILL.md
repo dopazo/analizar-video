@@ -94,8 +94,10 @@ navegador, con resaltado palabra a palabra (si se transcribió con `--words`),
 colores por hablante y búsqueda. Si existen, el resumen y el índice más
 recientes aparecen como pestañas junto a la transcripción, y cada `[HH:MM:SS]`
 que contengan lleva a ese momento del video; las imágenes que referencien dentro
-de `<video>_analisis/` (los frames) se muestran. Por eso conviene ofrecerlo al
-final, cuando ya está todo escrito:
+de `<video>_analisis/` (los frames) se muestran. Si hay índice, sus capítulos
+además parten la barra de tiempo en tramos y, al pasar el mouse, se ve el título
+del capítulo y una miniatura del video, como en YouTube. Por eso conviene
+ofrecerlo al final, cuando ya está todo escrito:
 
 > ¿Quieres abrirlo en el visor? Video y transcripción sincronizados, con el
 > resumen y el índice en pestañas.
@@ -305,6 +307,7 @@ reunion_analisis/
 ├── reunion_indice_yymmdd_hhmmss.md
 ├── reunion_audio.m4a                        # caché, se reutiliza
 ├── reunion_visor.mp4                        # solo si el formato no se reproducía en el navegador
+├── reunion_miniaturas.jpg / .vtt           # vista previa de la barra del visor (caché)
 └── frames/
     └── frame_HH-MM-SS.mmm.png
 ```

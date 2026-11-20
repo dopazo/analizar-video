@@ -98,7 +98,9 @@ que se está diciendo, colorea por hablante, muestra en una franja bajo el video
 quién habla a lo largo de la reunión y dónde caen los resultados de una
 búsqueda. Clic en cualquier palabra salta a ese momento. Si ya hay resumen o
 índice de temas, aparecen en pestañas al lado de la transcripción y cada
-timestamp que contienen es un enlace a ese momento del video. El agente lo
+timestamp que contienen es un enlace a ese momento del video. Los capítulos
+del índice también parten la barra de tiempo, y al pasar el mouse se ve el
+título del capítulo con una miniatura del video, como en YouTube. El agente lo
 ofrece al final, cuando ya está todo escrito, y el servidor se apaga solo al
 cerrar la ventana: no quedan procesos corriendo por detrás. Todo local, sin
 instalar nada más:

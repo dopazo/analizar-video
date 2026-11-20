@@ -155,7 +155,9 @@ def armar_datos(media: Path, url_media: str) -> dict:
     datos: dict = {"video": {"nombre": media.name, "url": url_media,
                              "audio": media.suffix.lower() in AUDIO_EXTS},
                    "transcripcion": None, "hablantes": [],
-                   "documentos": leer_documentos(media)}
+                   "documentos": leer_documentos(media),
+                   "capitulos": len(capitulos(media)),
+                   "miniaturas": bool(Handler.miniaturas and Handler.miniaturas.listas())}
     if not elegida:
         return datos
     txt, palabras_path = elegida
@@ -174,6 +176,130 @@ def armar_datos(media: Path, url_media: str) -> dict:
             orden.append(ln["speaker"])
     datos["hablantes"] = orden
     return datos
+
+
+# --- Capítulos (desde el índice) --------------------------------------------
+
+_T = r"\d{1,2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?"
+RE_TS_INDICE = re.compile(rf"\[({_T})(?:\s*[–—-]\s*{_T})?\]|\b(\d{{1,2}}:\d{{2}}:\d{{2}}(?:\.\d{{1,3}})?)\b")
+
+
+def a_segundos(ts: str) -> float:
+    total = 0.0
+    for parte in ts.split(":"):
+        total = total * 60 + float(parte)
+    return total
+
+
+def vtt_ts(seg: float) -> str:
+    ms = int(round(max(seg, 0) * 1000))
+    h, ms = divmod(ms, 3_600_000)
+    m, ms = divmod(ms, 60_000)
+    s, ms = divmod(ms, 1000)
+    return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
+
+
+def capitulos(media: Path) -> list[tuple[float, str]]:
+    """(inicio, título) de cada línea del índice más reciente que tenga timestamp."""
+    candidatos = sorted(carpeta_analisis(media).glob(f"{media.stem}_indice_*.md"))
+    if not candidatos:
+        return []
+    caps: dict[float, str] = {}
+    for linea in candidatos[-1].read_text(encoding="utf-8").splitlines():
+        m = RE_TS_INDICE.search(linea)
+        if not m:
+            continue
+        inicio = a_segundos(m.group(1) or m.group(2))
+        titulo = RE_TS_INDICE.sub(" ", linea)
+        titulo = re.sub(r"[|*_`#>]|^\s*(?:[-+]|\d+\.)\s+", " ", titulo)
+        titulo = re.sub(r"\s+", " ", titulo).strip(" -—–:·")
+        if titulo and inicio not in caps:
+            caps[inicio] = titulo
+    return sorted(caps.items())
+
+
+def duracion(media: Path) -> float | None:
+    if not shutil.which("ffprobe"):
+        return None
+    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                        "-of", "default=nw=1:nk=1", str(media)], capture_output=True, text=True)
+    try:
+        return float(r.stdout.strip())
+    except ValueError:
+        return None
+
+
+def capitulos_vtt(media: Path, total: float | None) -> str:
+    caps = capitulos(media)
+    fin_total = total or (caps[-1][0] + 3600 if caps else 0)
+    lineas = ["WEBVTT", ""]
+    for i, (inicio, titulo) in enumerate(caps):
+        fin = caps[i + 1][0] if i + 1 < len(caps) else fin_total
+        if fin <= inicio:
+            continue
+        lineas += [f"{vtt_ts(inicio)} --> {vtt_ts(fin)}", titulo, ""]
+    return "\n".join(lineas)
+
+
+# --- Miniaturas de la barra (como el "storyboard" de YouTube) ----------------
+# Una sola imagen con una grilla de cuadros + un .vtt que dice qué recuadro va
+# en cada tramo. Se genera una vez, en segundo plano, decodificando solo los
+# fotogramas clave (rápido aun en videos largos), y queda en <video>_analisis/.
+
+MINI_ANCHO = 192
+MINI_COLUMNAS = 10
+MINI_MAX = 240  # cuadros como máximo
+
+
+class Miniaturas:
+    def __init__(self, media: Path, original: Path, total: float | None):
+        carpeta = carpeta_analisis(original)
+        self.media = media
+        self.total = total
+        self.img = carpeta / f"{original.stem}_miniaturas.jpg"
+        self.vtt = carpeta / f"{original.stem}_miniaturas.vtt"
+
+    def listas(self) -> bool:
+        return (self.img.is_file() and self.vtt.is_file()
+                and self.vtt.stat().st_mtime >= self.media.stat().st_mtime)
+
+    def generar(self) -> None:
+        if self.listas() or not self.total or not shutil.which("ffmpeg"):
+            return
+        paso = max(2.0, self.total / MINI_MAX)
+        n = int(self.total // paso) + 1
+        filas = -(-n // MINI_COLUMNAS)
+        self.img.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.img.with_name(self.img.stem + ".tmp.jpg")
+        r = subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-skip_frame", "nokey", "-i", str(self.media),
+             "-an", "-vf", f"fps=1/{paso:.3f},scale={MINI_ANCHO}:-2,tile={MINI_COLUMNAS}x{filas}",
+             "-frames:v", "1", "-q:v", "5", str(tmp)],
+            capture_output=True)
+        if r.returncode != 0 or not tmp.is_file():
+            tmp.unlink(missing_ok=True)
+            return
+        tmp.replace(self.img)
+        # alto real de cada cuadro: el de la grilla dividido por las filas
+        alto = self._alto_cuadro(filas)
+        lineas = ["WEBVTT", ""]
+        for i in range(n):
+            a, b = i * paso, min((i + 1) * paso, self.total)
+            if b <= a:
+                break
+            x, y = (i % MINI_COLUMNAS) * MINI_ANCHO, (i // MINI_COLUMNAS) * alto
+            lineas += [f"{vtt_ts(a)} --> {vtt_ts(b)}",
+                       f"miniaturas.jpg#xywh={x},{y},{MINI_ANCHO},{alto}", ""]
+        self.vtt.write_text("\n".join(lineas), encoding="utf-8")
+        log("Miniaturas de la barra listas.")
+
+    def _alto_cuadro(self, filas: int) -> int:
+        r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=height",
+                            "-of", "default=nw=1:nk=1", str(self.img)], capture_output=True, text=True)
+        try:
+            return int(r.stdout.split()[0]) // filas
+        except (ValueError, IndexError):
+            return MINI_ANCHO * 9 // 16
 
 
 # --- Video -----------------------------------------------------------------
@@ -263,6 +389,8 @@ def vigilar(srv: "Servidor") -> None:
 class Handler(http.server.BaseHTTPRequestHandler):
     media: Path      # lo que se sirve (puede ser el remux)
     original: Path   # el video que pidió el usuario: de ahí salen los datos
+    total: float | None = None
+    miniaturas: "Miniaturas | None" = None
 
     def log_message(self, fmt, *args):  # silencioso: el navegador pide muchos rangos
         pass
@@ -293,6 +421,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._servir_media(cuerpo)
         if ruta == "/api/vivo":
             return self._vivo()
+        if ruta == "/api/capitulos.vtt":
+            data = capitulos_vtt(self.original, self.total).encode("utf-8")
+            return self._enviar(200, "text/vtt; charset=utf-8", data, cuerpo)
+        if ruta == "/api/estado":
+            listo = bool(self.miniaturas and self.miniaturas.listas())
+            return self._enviar(200, "application/json", json.dumps({"miniaturas": listo}).encode(), cuerpo)
+        if ruta in ("/api/miniaturas.vtt", "/api/miniaturas.jpg"):
+            m = self.miniaturas
+            if not m or not m.listas():
+                return self.send_error(404)
+            f, tipo = (m.vtt, "text/vtt; charset=utf-8") if ruta.endswith(".vtt") else (m.img, "image/jpeg")
+            return self._enviar(200, tipo, f.read_bytes(), cuerpo)
         if ruta == "/analisis":
             return self._servir_imagen(parse_qs(url.query).get("ruta", [""])[0], cuerpo)
         return self._servir_ui(ruta, cuerpo)
@@ -423,6 +563,10 @@ def main() -> int:
 
     Handler.media = preparar_media(media)
     Handler.original = media
+    Handler.total = duracion(Handler.media)
+    if media.suffix.lower() not in AUDIO_EXTS:
+        Handler.miniaturas = Miniaturas(Handler.media, media, Handler.total)
+        threading.Thread(target=Handler.miniaturas.generar, daemon=True).start()
     datos = armar_datos(media, "media")
     t = datos["transcripcion"]
     if t:
@@ -433,6 +577,8 @@ def main() -> int:
             f"{carpeta_analisis(media).name}/; el visor mostrara solo el video.")
     for d in datos["documentos"]:
         log(f"{d['titulo']}: {d['archivo']}")
+    if datos["capitulos"]:
+        log(f"Capitulos en la barra: {datos['capitulos']} (del indice)")
 
     srv = None
     for puerto in range(args.port, args.port + 20):

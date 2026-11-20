@@ -19,6 +19,10 @@ export interface Datos {
   } | null;
   hablantes: string[];
   documentos: Documento[];
+  /** cantidad de capítulos que el servidor sacó del índice (0 = sin índice) */
+  capitulos: number;
+  /** si ya está la grilla de miniaturas para la vista previa de la barra */
+  miniaturas: boolean;
 }
 
 export interface Documento {

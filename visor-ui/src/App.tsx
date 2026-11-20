@@ -208,6 +208,8 @@ export default function App() {
             nombre={datos.video.nombre}
             audio={datos.video.audio}
             mediaRef={mediaRef}
+            capitulos={datos.capitulos ?? 0}
+            miniaturas={!!datos.miniaturas}
             bajoSlider={
               <MapaTiempo
                 lineas={lineas}

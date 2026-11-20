@@ -14,49 +14,19 @@ instrucciones le enseña al agente cuándo y cómo usarlos.
 
 ## Instalar
 
-La skill es la carpeta [`.claude/skills/analizar-video/`](.claude/skills/analizar-video/)
-de este repo. Instalarla es copiar esa carpeta a donde tu agente busca skills, y
-**dónde la pongas define quién la ve**:
-
-| Alcance | Carpeta (Claude Code) | La ve… |
-|---|---|---|
-| **Proyecto** | `<tu-proyecto>/.claude/skills/analizar-video/` | solo ese proyecto; puedes versionarla con él |
-| **Usuario** | `~/.claude/skills/analizar-video/` (Windows: `C:\Users\<tú>\.claude\skills\analizar-video\`) | todos tus proyectos |
-
-Otros agentes (Codex, Cursor, etc.) leen el mismo formato pero desde otra
-carpeta: revisa la documentación del tuyo.
-
-### Opción A: clonar el repo y copiar la carpeta
-
-```
-git clone https://github.com/dopazo/analizar-video.git
-```
-
-Copia `analizar-video/.claude/skills/analizar-video/` a la carpeta que elegiste
-arriba, con el explorador de archivos o como prefieras. (Si solo quieres
-probarla, abre tu agente dentro del repo clonado: ahí ya está disponible como
-skill de proyecto.)
-
-### Opción B: instalar directo desde la terminal
-
-Sin git y sin clonar: baja solo la skill. Son dos pasos: **(1)** elige el
-destino corriendo **una** de las dos líneas, **(2)** corre el bloque de
-descarga. El mismo bloque sirve para **actualizar**: reemplaza la versión
-anterior.
+Clona este repo y copia `.claude/skills/analizar-video/` donde quieras, pásale
+la URL del repo a tu agente y pídele que la instale, o usa estos comandos.
+Primero elige el destino con **una** de las dos líneas y luego corre la
+descarga (sirve también para actualizar).
 
 **Windows (PowerShell)**
 
 ```powershell
-# (1a) En un proyecto: entra primero a la carpeta del proyecto
-cd C:\ruta\a\tu-proyecto
-$destino = "$PWD\.claude\skills"
-
-# (1b) O para tu usuario (todos los proyectos)
-$destino = "$HOME\.claude\skills"
+$destino = "$HOME\.claude\skills"   # usuario: todos tus proyectos
+$destino = "$PWD\.claude\skills"    # proyecto: corre esto dentro de la carpeta del proyecto
 ```
 
 ```powershell
-# (2) Descargar e instalar en $destino
 $ProgressPreference = "SilentlyContinue"
 $zip = "$env:TEMP\analizar-video.zip"; $tmp = "$env:TEMP\analizar-video"
 Invoke-WebRequest https://github.com/dopazo/analizar-video/archive/refs/heads/main.zip -OutFile $zip
@@ -68,29 +38,19 @@ Remove-Item $zip, $tmp -Recurse -Force
 Write-Host "Instalada en $destino\analizar-video"
 ```
 
-Usa solo comandos propios de PowerShell (sin `tar` ni `curl`), así no importa
-qué otras herramientas tengas en el PATH.
-
-**macOS y Linux (Terminal)**
+**macOS y Linux**
 
 ```bash
-# (1a) En un proyecto: entra primero a la carpeta del proyecto
-cd ~/ruta/a/tu-proyecto
-destino="$PWD/.claude/skills"
-
-# (1b) O para tu usuario (todos los proyectos)
-destino="$HOME/.claude/skills"
+destino="$HOME/.claude/skills"   # usuario: todos tus proyectos
+destino="$PWD/.claude/skills"    # proyecto: corre esto dentro de la carpeta del proyecto
 ```
 
 ```bash
-# (2) Descargar e instalar en $destino
 mkdir -p "$destino" && rm -rf "$destino/analizar-video"
 curl -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz \
   | tar -xz -C "$destino" --strip-components=3 analizar-video-main/.claude/skills/analizar-video
 echo "Instalada en $destino/analizar-video"
 ```
-
-En cualquier caso queda una carpeta `analizar-video/` con `SKILL.md` adentro.
 
 Después instala lo que pide: [uv](https://docs.astral.sh/uv/) y `ffmpeg` (git
 solo si vas a diarizar). El detalle por sistema, y sin permisos de

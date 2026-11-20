@@ -14,38 +14,83 @@ instrucciones le enseña al agente cuándo y cómo usarlos.
 
 ## Instalar
 
-Descarga la skill sin clonar el repo. Los comandos cambian según el sistema:
-elige el bloque del tuyo. Lo deja en `~/.claude/skills/analizar-video/`, disponible para Claude
-Code en todos tus proyectos.
+La skill es la carpeta [`.claude/skills/analizar-video/`](.claude/skills/analizar-video/)
+de este repo. Instalarla es copiar esa carpeta a donde tu agente busca skills, y
+**dónde la pongas define quién la ve**:
+
+| Alcance | Carpeta (Claude Code) | La ve… |
+|---|---|---|
+| **Proyecto** | `<tu-proyecto>/.claude/skills/analizar-video/` | solo ese proyecto; puedes versionarla con él |
+| **Usuario** | `~/.claude/skills/analizar-video/` (Windows: `C:\Users\<tú>\.claude\skills\analizar-video\`) | todos tus proyectos |
+
+Otros agentes (Codex, Cursor, etc.) leen el mismo formato pero desde otra
+carpeta: revisa la documentación del tuyo.
+
+### Opción A: clonar el repo y copiar la carpeta
+
+```
+git clone https://github.com/dopazo/analizar-video.git
+```
+
+Copia `analizar-video/.claude/skills/analizar-video/` a la carpeta que elegiste
+arriba, con el explorador de archivos o como prefieras. (Si solo quieres
+probarla, abre tu agente dentro del repo clonado: ahí ya está disponible como
+skill de proyecto.)
+
+### Opción B: instalar directo desde la terminal
+
+Sin git y sin clonar: baja solo la skill. Son dos pasos: **(1)** elige el
+destino corriendo **una** de las dos líneas, **(2)** corre el bloque de
+descarga. El mismo bloque sirve para **actualizar**: reemplaza la versión
+anterior.
 
 **Windows (PowerShell)**
 
 ```powershell
+# (1a) En un proyecto: entra primero a la carpeta del proyecto
+cd C:\ruta\a\tu-proyecto
+$destino = "$PWD\.claude\skills"
+
+# (1b) O para tu usuario (todos los proyectos)
 $destino = "$HOME\.claude\skills"
+```
+
+```powershell
+# (2) Descargar e instalar en $destino
 $ProgressPreference = "SilentlyContinue"
 $zip = "$env:TEMP\analizar-video.zip"; $tmp = "$env:TEMP\analizar-video"
 Invoke-WebRequest https://github.com/dopazo/analizar-video/archive/refs/heads/main.zip -OutFile $zip
 Expand-Archive $zip $tmp -Force
 New-Item -ItemType Directory -Force $destino | Out-Null
-Copy-Item "$tmp\analizar-video-main\.claude\skills\analizar-video" $destino -Recurse -Force
+Remove-Item "$destino\analizar-video" -Recurse -Force -ErrorAction SilentlyContinue
+Copy-Item "$tmp\analizar-video-main\.claude\skills\analizar-video" $destino -Recurse
 Remove-Item $zip, $tmp -Recurse -Force
+Write-Host "Instalada en $destino\analizar-video"
 ```
 
 Usa solo comandos propios de PowerShell (sin `tar` ni `curl`), así no importa
-qué otras herramientas tengas en el PATH. Para instalarla en un solo proyecto,
-cambia la primera línea por `$destino = "C:\ruta\a\tu-proyecto\.claude\skills"`.
+qué otras herramientas tengas en el PATH.
 
 **macOS y Linux (Terminal)**
 
 ```bash
-mkdir -p ~/.claude/skills && cd ~/.claude/skills
-curl -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz | tar -xz --strip-components=3 analizar-video-main/.claude/skills/analizar-video
+# (1a) En un proyecto: entra primero a la carpeta del proyecto
+cd ~/ruta/a/tu-proyecto
+destino="$PWD/.claude/skills"
+
+# (1b) O para tu usuario (todos los proyectos)
+destino="$HOME/.claude/skills"
 ```
 
-En cualquiera de los dos queda una carpeta `analizar-video/` con `SKILL.md`
-adentro. **Para actualizar**, borra esa carpeta y repite el comando. Para usarla
-en un solo proyecto, usa `<tu-proyecto>/.claude/skills/` en vez de
-`~/.claude/skills/`.
+```bash
+# (2) Descargar e instalar en $destino
+mkdir -p "$destino" && rm -rf "$destino/analizar-video"
+curl -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz \
+  | tar -xz -C "$destino" --strip-components=3 analizar-video-main/.claude/skills/analizar-video
+echo "Instalada en $destino/analizar-video"
+```
+
+En cualquier caso queda una carpeta `analizar-video/` con `SKILL.md` adentro.
 
 Después instala lo que pide: [uv](https://docs.astral.sh/uv/) y `ffmpeg` (git
 solo si vas a diarizar). El detalle por sistema, y sin permisos de
@@ -201,21 +246,6 @@ Plantilla en [`references/formato_contexto.md`](.claude/skills/analizar-video/re
   lejano dan transcripciones con tramos incomprensibles, por más glosario que
   haya.
 
-## Otras formas de instalar
-
-### Clonando el repo
-
-La skill ya vive en `.claude/skills/analizar-video/`, así que al clonar **queda
-disponible al abrir el proyecto** sin copiar nada.
-
-### Otros agentes
-
-La carpeta puede vivir donde tu agente busque sus instrucciones; la estructura
-interna no cambia. Apúntalo al `SKILL.md`, que tiene la ruta de trabajo
-completa, los comandos y las reglas.
-
-Los ejemplos de este README usan `.claude/skills/analizar-video/` como ruta.
-
 ## Entorno
 
 ### Verifica que esté todo
@@ -223,6 +253,9 @@ Los ejemplos de este README usan `.claude/skills/analizar-video/` como ruta.
 ```bash
 uv run ~/.claude/skills/analizar-video/scripts/check_env.py
 ```
+
+(Si la instalaste en un proyecto, desde ese proyecto:
+`uv run .claude/skills/analizar-video/scripts/check_env.py`.)
 
 Te dice si falta `ffmpeg` (o `git`, para diarizar), si hay GPU NVIDIA
 utilizable, qué modelos tienes descargados y qué nivel conviene según la VRAM

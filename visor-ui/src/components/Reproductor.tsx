@@ -34,6 +34,25 @@ interface Props {
   version: number;
 }
 
+/**
+ * Media Chrome escucha el `load` solo de la pista de capítulos que había al
+ * montar el video: si el índice aparece después, o se recarga, la pista nueva
+ * entra vacía y la barra no se entera cuando llegan sus capítulos. Al cargar se
+ * le avisa con un `change` en la lista de pistas, que sí escucha siempre.
+ */
+function useAvisarCapitulos(pista: RefObject<HTMLTrackElement | null>, media: RefObject<HTMLVideoElement | null>, version: number) {
+  useEffect(() => {
+    const el = pista.current;
+    const video = media.current;
+    if (!el || !video) return;
+    if (el.track.mode === "disabled") el.track.mode = "hidden"; // si no, no baja los cues
+    const avisar = () => video.textTracks.dispatchEvent(new Event("change"));
+    if (el.readyState === 2) avisar();
+    el.addEventListener("load", avisar);
+    return () => el.removeEventListener("load", avisar);
+  }, [pista, media, version]);
+}
+
 /** La pista de subtítulos se sirve como blob: se arma en el navegador. */
 function useUrlTexto(texto: string | null, tipo: string): string | null {
   const url = useMemo(() => (texto ? URL.createObjectURL(new Blob([texto], { type: tipo })) : null), [texto, tipo]);
@@ -99,6 +118,8 @@ export function Reproductor({ url, nombre, audio, mediaRef, bajoSlider, capitulo
   const urlSubtitulos = useUrlTexto(audio ? null : subtitulos, "text/vtt");
   const miniListas = useMiniaturas(miniaturas, !audio);
   useAmbiente(mediaRef, lienzo, !audio);
+  const pistaCapitulos = useRef<HTMLTrackElement>(null);
+  useAvisarCapitulos(pistaCapitulos, mediaRef, capitulos > 0 ? version : -1);
   return (
     <div className="escenario">
       {!audio && <canvas ref={lienzo} className="ambiente" width={32} height={18} aria-hidden />}
@@ -116,7 +137,7 @@ export function Reproductor({ url, nombre, audio, mediaRef, bajoSlider, capitulo
           <video slot="media" src={url} preload="auto" playsInline ref={mediaRef}>
             {/* Capítulos del índice: Media Chrome parte la barra en tramos y
                 muestra el título del tramo al pasar el mouse, como YouTube. */}
-            {capitulos > 0 && <track key={version} kind="chapters" src={`api/capitulos.vtt?v=${version}`} srcLang="es" default />}
+            {capitulos > 0 && <track key={version} ref={pistaCapitulos} kind="chapters" src={`api/capitulos.vtt?v=${version}`} srcLang="es" default />}
             {miniListas && <track kind="metadata" label="thumbnails" src="api/miniaturas.vtt" default />}
             {/* Apagados al inicio; "c" o el botón CC los prenden (también en pantalla completa). */}
             {urlSubtitulos && <track kind="captions" label="Transcripción" srcLang="es" src={urlSubtitulos} />}

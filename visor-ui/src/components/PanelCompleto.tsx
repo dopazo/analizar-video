@@ -9,6 +9,7 @@ import {
   MediaDurationDisplay,
   MediaMuteButton,
   MediaPlaybackRateButton,
+  MediaPipButton,
 } from "media-chrome/react";
 import { enlace } from "./Reproductor";
 
@@ -80,6 +81,8 @@ export function BarraFlotante({ audio }: { audio: boolean }) {
       <MediaDurationDisplay {...enlace} />
       <MediaPlaybackRateButton rates={[1, 1.25, 1.5, 1.75, 2]} {...enlace} />
       <MediaMuteButton {...enlace} />
+      {/* Video en miniatura (P): para ver al que habla mientras se lee a pantalla completa. */}
+      {!audio && <MediaPipButton {...enlace} title="Video en miniatura (P)" />}
     </MediaControlBar>
   );
 }

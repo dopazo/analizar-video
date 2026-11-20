@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Marked, type Tokens } from "marked";
 import type { Documento as Doc } from "../tipos";
+import { normalizar } from "../lib/util";
 
 /** "01:02:03.5" | "02:03" → segundos */
 function aSegundos(ts: string): number {
@@ -67,9 +68,68 @@ interface Props {
   pestanas: ReactNode;
   /** botones a la derecha de la cabecera (pantalla completa del panel) */
   acciones?: ReactNode;
+  /** lo que se busca (Ctrl+F) y cuál resultado está elegido */
+  consulta: string;
+  actual: number;
+  onResultados: (n: number) => void;
 }
 
-export function Documento({ doc, mediaRef, onSaltar, pestanas, acciones }: Props) {
+/**
+ * Resalta la consulta en el HTML ya pintado, sin tildes ni mayúsculas, y aunque
+ * cruce negritas o enlaces: se arma un solo texto normalizado con el mapa de
+ * cada carácter a su nodo, y cada resultado se envuelve en uno o más <mark>
+ * con el mismo data-m. Devuelve cuántos hubo.
+ */
+function resaltar(raiz: HTMLElement, consulta: string): number {
+  for (const m of raiz.querySelectorAll("mark.hit-doc")) m.replaceWith(...m.childNodes);
+  raiz.normalize();
+  const q = normalizar(consulta.trim()).replace(/\s+/g, " ");
+  if (q.length < 2) return 0;
+
+  let texto = "";
+  const mapa: { nodo: Text; i: number }[] = [];
+  const recorrido = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
+  for (let n = recorrido.nextNode() as Text | null; n; n = recorrido.nextNode() as Text | null) {
+    const v = n.data;
+    for (let i = 0; i < v.length; i++) {
+      if (/\s/.test(v[i])) {
+        if (texto.endsWith(" ") || !texto) continue;
+        texto += " ";
+        mapa.push({ nodo: n, i });
+        continue;
+      }
+      for (const c of normalizar(v[i])) {
+        texto += c;
+        mapa.push({ nodo: n, i });
+      }
+    }
+  }
+
+  // Tramos [nodo, desde, hasta) por resultado; se envuelven de atrás hacia
+  // adelante para que partir un nodo no corra los offsets que faltan.
+  const tramos: { nodo: Text; desde: number; hasta: number; m: number }[] = [];
+  let m = 0;
+  for (let pos = texto.indexOf(q); pos >= 0; pos = texto.indexOf(q, pos + q.length), m++) {
+    for (let k = pos; k < pos + q.length; k++) {
+      const { nodo, i } = mapa[k];
+      const ult = tramos[tramos.length - 1];
+      if (ult && ult.m === m && ult.nodo === nodo) ult.hasta = i + 1;
+      else tramos.push({ nodo, desde: i, hasta: i + 1, m });
+    }
+  }
+  for (const t of tramos.reverse()) {
+    const r = document.createRange();
+    r.setStart(t.nodo, t.desde);
+    r.setEnd(t.nodo, t.hasta);
+    const mark = document.createElement("mark");
+    mark.className = "hit-doc";
+    mark.dataset.m = String(t.m);
+    r.surroundContents(mark);
+  }
+  return m;
+}
+
+export function Documento({ doc, mediaRef, onSaltar, pestanas, acciones, consulta, actual, onResultados }: Props) {
   const html = useMemo(() => marked.parse(doc.md, { async: false }) as string, [doc.md]);
   const cont = useRef<HTMLDivElement>(null);
 
@@ -111,6 +171,25 @@ export function Documento({ doc, mediaRef, onSaltar, pestanas, acciones }: Props
       el.removeEventListener("seeked", marcar);
     };
   }, [html, mediaRef, doc.tipo]);
+
+  // Búsqueda: se vuelve a resaltar cuando cambia el texto o el documento (el
+  // efecto de arriba ya reemplazó el HTML, así que va después).
+  const [pasada, setPasada] = useState(0);
+  useEffect(() => {
+    const raiz = cont.current;
+    onResultados(raiz ? resaltar(raiz, consulta) : 0);
+    setPasada((n) => n + 1);
+  }, [html, consulta, onResultados]);
+
+  // El resultado elegido: más marcado y centrado en pantalla.
+  useEffect(() => {
+    const raiz = cont.current;
+    if (!raiz) return;
+    raiz.querySelectorAll(".hit-actual").forEach((x) => x.classList.remove("hit-actual"));
+    const marcas = raiz.querySelectorAll<HTMLElement>(`mark.hit-doc[data-m="${actual}"]`);
+    marcas.forEach((x) => x.classList.add("hit-actual"));
+    marcas[0]?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [actual, pasada]);
 
   const vacio = doc.tipo === "notas" && !doc.cantidad;
 

@@ -710,3 +710,7 @@ media-controller > .atajos-flotantes, media-controller > .buscador-flotante {
 }
 media-controller > .buscador-flotante { top: 16px; bottom: auto; }
 media-controller > .atajos-flotantes { top: 18px; bottom: auto; flex-direction: column-reverse; }
+
+/* Resultados de búsqueda dentro de resumen, índice y notas */
+mark.hit-doc { background: var(--hit); color: inherit; border-radius: 2px; box-shadow: 0 0 0 1.5px var(--hit); }
+mark.hit-doc.hit-actual { background: var(--hit-actual); box-shadow: 0 0 0 1.5px var(--hit-actual); }

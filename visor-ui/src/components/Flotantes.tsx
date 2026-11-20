@@ -31,7 +31,8 @@ export const ATAJOS: [string, string][] = [
   ["J / L", "−10 s / +10 s"],
   ["← / →", "−5 s / +5 s"],
   ["N", "nota en este momento"],
-  [TECLA_BUSCAR, "buscar en lo dicho"],
+  [TECLA_BUSCAR, "buscar en la pestaña abierta"],
+  ["P", "video en miniatura"],
   ["C", "subtítulos"],
   [".", "volver a lo que suena"],
   ["M", "silenciar"],
@@ -149,17 +150,19 @@ interface PropsBuscador {
   mover: (paso: number) => void;
   onEscape: () => void;
   flotante?: boolean;
+  /** dónde busca: "lo que se dijo", "resumen", "índice"… */
+  donde: string;
 }
 
 /** El buscador de la cabecera; en pantalla completa, el mismo flotando arriba. */
-export function Buscador({ inputRef, consulta, setConsulta, total, actual, mover, onEscape, flotante }: PropsBuscador) {
+export function Buscador({ inputRef, consulta, setConsulta, total, actual, mover, onEscape, flotante, donde }: PropsBuscador) {
   return (
     <div className={`buscador${flotante ? " buscador-flotante" : ""}`}>
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16a6.47 6.47 0 0 0 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5Zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14Z"/></svg>
       <input
         ref={inputRef}
         type="search"
-        placeholder={`Buscar en lo que se dijo  (${TECLA_BUSCAR})`}
+        placeholder={`Buscar en ${donde}  (${TECLA_BUSCAR})`}
         value={consulta}
         onChange={(e) => setConsulta(e.target.value)}
         onKeyDown={(e) => {
@@ -172,7 +175,7 @@ export function Buscador({ inputRef, consulta, setConsulta, total, actual, mover
             onEscape();
           }
         }}
-        aria-label="Buscar en la transcripción"
+        aria-label={`Buscar en ${donde}`}
       />
       {consulta.trim().length >= 2 && (
         <div className="buscador-nav">

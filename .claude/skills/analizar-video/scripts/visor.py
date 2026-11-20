@@ -1,3 +1,7 @@
+# /// script
+# requires-python = ">=3.9"
+# dependencies = []
+# ///
 """Visor local: el video con su transcripción sincronizada, en el navegador.
 
     uv run scripts/visor.py reunion.mp4            # abre el navegador
@@ -529,7 +533,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         break
                     self.wfile.write(trozo)
                     restante -= len(trozo)
-        except (BrokenPipeError, ConnectionResetError):
+        except ConnectionError:  # Broken pipe / Reset / Aborted (WinError 10053)
             pass  # el navegador corta conexiones al adelantar: es normal
 
     def _rango_invalido(self, size: int):

@@ -20,10 +20,12 @@ gpu = [
 # diarizar.py (quien habla). Con uv no hace falta: el script trae su bloque
 # PEP 723 con torch CUDA y el commit de transformers fijado. Para tu propio
 # entorno, instala torch desde https://download.pytorch.org/whl/cu128.
+# El marcador evita que este extra rompa la resolucion del proyecto en Python
+# <3.11 (ese commit de transformers lo exige).
 diarizacion = [
-    "torch",
-    "numpy",
-    "transformers @ git+https://github.com/huggingface/transformers@297aafdb6dd64d63a335b3282bba6d35b4007836",
+    "torch; python_version >= '3.11'",
+    "numpy; python_version >= '3.11'",
+    "transformers @ git+https://github.com/huggingface/transformers@297aafdb6dd64d63a335b3282bba6d35b4007836 ; python_version >= '3.11'",
 ]
 
 # Nota sobre CUDA 11:

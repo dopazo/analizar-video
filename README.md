@@ -197,7 +197,7 @@ descargados y qué nivel conviene según la VRAM libre.
 
 ### Requisitos
 
-- **Python 3.9+** (3.10+ para `diarizar.py`)
+- **Python 3.9+** (3.11+ para `diarizar.py`)
 - **[uv](https://docs.astral.sh/uv/)** (recomendado): los scripts declaran sus
   dependencias inline (PEP 723), así que `uv run script.py` las resuelve solo,
   sin instalar nada global. Si prefieres tu propio entorno, instala las

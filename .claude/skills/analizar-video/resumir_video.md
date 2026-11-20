@@ -22,8 +22,10 @@ Ante la duda, pregunta qué le sirve más antes de escribir uno largo.
   coma, cada una con sus propios corchetes. El formato es parseable a propósito
   —la idea es poder clickear la marca y saltar al segundo en un reproductor—,
   así que no lo abrevies ni lo adornes.
-- **No atribuyas a personas.** No hay diarización: "en [00:12:30] se plantea
-  que…", nunca "Juan dijo que…". Ver `SKILL.md`.
+- **No atribuyas a personas** salvo que exista un `_hablantes_corregido.txt`
+  con nombres confirmados por el usuario; ahí sí: "en [00:12:30] Ana plantea
+  que…". Sin eso: "en [00:12:30] se plantea que…", nunca "Juan dijo que…".
+  Ver `SKILL.md`.
 - **Marca lo inferido.** Si un responsable o un plazo no está dicho de forma
   explícita, escríbelo como supuesto, no como hecho.
 - **Glosario emergente**: si aparecen siglas o términos que no estaban en el

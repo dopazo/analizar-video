@@ -12,6 +12,10 @@ Son cinco scripts de Python sin estado y un archivo de instrucciones. Los
 scripts los puede invocar cualquier agente —o tú a mano—; el archivo de
 instrucciones le enseña al agente cuándo y cómo usarlos.
 
+![El visor: el video con la transcripción sincronizada, quién habla y los capítulos del índice en la barra](docs/visor.png)
+
+<sub>Reunión ficticia armada para la captura con [`docs/demo/`](docs/demo/).</sub>
+
 ## Instalar
 
 Clona este repo y copia `.claude/skills/analizar-video/` donde quieras, pásale
@@ -142,6 +146,8 @@ abierto, sin perder el punto del video. El agente lo ofrece al final, cuando ya
 está todo escrito, y el servidor se apaga solo al cerrar la ventana: no quedan
 procesos corriendo por detrás. Todo local, sin instalar nada más: la interfaz
 viaja compilada dentro de la skill.
+
+![Pestaña Resumen del visor: el acta con sus timestamps como enlaces al video](docs/visor_resumen.png)
 
 **Re-transcribir solo un tramo dudoso.** Cuando una frase queda incomprensible,
 se vuelve a pasar ese pedazo por un modelo mejor con un glosario apuntado.
@@ -386,6 +392,7 @@ analizar-video/                        # el repo
     └── references/
         └── formato_contexto.md
 visor-ui/                              # fuente de la UI (React + Vite), fuera de la skill
+docs/                                  # capturas del README y la demo que las genera
 ```
 
 ## Créditos

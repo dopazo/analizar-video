@@ -48,6 +48,11 @@ CPU_FALLBACK = ("small", "int8")
 
 # Medido: ~650 MiB de pico diarizando 35 min en modo offline. Con margen.
 DIAR_VRAM_MIB = 1000
+# Deben calzar con el bloque PEP 723 de diarizar.py: torch del indice cu130,
+# que pide un driver de la rama 580 o mas nueva (con uno anterior, torch no ve
+# la GPU y diarizar.py corre en CPU).
+DIAR_TORCH_MIN = (2, 14)
+DIAR_DRIVER_MIN = 580
 
 
 def modelos_locales() -> dict:
@@ -124,11 +129,19 @@ def cuda_libs_present() -> bool | None:
     return False
 
 
+def _version(v: str) -> tuple[int, ...]:
+    """'2.14.1+cu130' -> (2, 14, 1)."""
+    return tuple(int(x) for x in re.findall(r"\d+", v.split("+")[0])[:3])
+
+
 def torch_de_diarizacion() -> str | None:
-    """Version de torch del entorno que uv armo para diarizar.py, si existe.
+    """Version de torch del entorno que uv armo para diarizar.py, si sirve.
 
     Es la parte pesada de la primera corrida (~2,6 GB). uv guarda el entorno
-    de cada script en <cache>/environments-v2/<script>-<hash>/.
+    de cada script en <cache>/environments-v2/<script>-<hash>/, y uno por cada
+    version de las dependencias: los que quedaron de una version anterior de
+    la skill (torch mas viejo que DIAR_TORCH_MIN) no cuentan, porque la proxima
+    corrida igual descarga el nuevo.
     """
     out = correr(["uv", "cache", "dir"], timeout=20) if shutil.which("uv") else None
     if not out or not out.strip():
@@ -136,26 +149,34 @@ def torch_de_diarizacion() -> str | None:
     envs = Path(out.strip()) / "environments-v2"
     if not envs.is_dir():
         return None
-    for env in envs.glob("diarizar-*"):
-        for info in env.glob("*/**/site-packages/torch-*.dist-info"):
-            return info.name[len("torch-"):-len(".dist-info")]
-    return None
+    versiones = [info.name[len("torch-"):-len(".dist-info")]
+                 for env in envs.glob("diarizar-*")
+                 for info in env.glob("*/**/site-packages/torch-*.dist-info")]
+    validas = [v for v in versiones if _version(v) >= DIAR_TORCH_MIN]
+    return max(validas, key=_version) if validas else None
+
+
+def driver_cuda13(gpu: dict) -> bool:
+    """Si el driver NVIDIA alcanza para el torch con CUDA 13.0 de diarizar.py."""
+    try:
+        return int((gpu.get("driver_version") or "").split(".")[0]) >= DIAR_DRIVER_MIN
+    except ValueError:
+        return True  # ilegible: no adivinar
 
 
 def diarizacion(gpu: dict) -> dict:
     mb = modelo_diarizacion_mb()
     torch_v = torch_de_diarizacion()
     libre = gpu["vram_free_mib"]
-    if gpu["available"] and (libre is None or libre >= DIAR_VRAM_MIB):
+    driver_ok = not gpu["available"] or driver_cuda13(gpu)
+    if gpu["available"] and driver_ok and (libre is None or libre >= DIAR_VRAM_MIB):
         device = "cuda"
     else:
         device = "cpu"
     return {
         "modelo_mb": mb,
         "torch": torch_v,
-        # transformers se instala desde GitHub (el soporte del modelo aún no sale
-        # en PyPI): uv necesita el ejecutable git para clonarlo la primera vez.
-        "git": shutil.which("git") is not None,
+        "driver_ok": driver_ok,
         "listo": mb is not None and torch_v is not None,
         "device": device,
         "descarga_pendiente_gb": (0 if mb is not None and torch_v is not None
@@ -208,16 +229,6 @@ def suggest(gpu: dict, cuda_libs: bool | None, descargados: dict[str, int]) -> d
             elegido = alternativa
 
     return {"device": "cuda", "model": elegido, "compute_type": ct, "reason": motivo}
-
-
-def git_install_cmd() -> str:
-    system = platform.system()
-    if system == "Windows":
-        return ("winget install --id Git.Git -e  (sin permisos de administrador: "
-                "PortableGit desde https://git-scm.com/download/win, agregando su carpeta cmd al PATH del usuario)")
-    if system == "Darwin":
-        return "xcode-select --install  (o brew install git)"
-    return "sudo apt install git"
 
 
 def ffmpeg_install_cmd() -> str:
@@ -286,12 +297,11 @@ def collect() -> dict:
             "pip install nvidia-cublas-cu12 \"nvidia-cudnn-cu12>=9,<10\")")
 
     dz = report["diarizacion"]
-    if not dz["git"] and not dz["torch"]:
+    if not dz["driver_ok"]:
         report["warnings"].append(
-            "Para diarizar (opcional) falta git: la primera corrida de diarizar.py "
-            "instala transformers desde GitHub y uv lo clona con git. Sin git falla con "
-            "'Git executable not found'. Transcribir y el resto no lo necesitan. "
-            "Instalar con: " + git_install_cmd())
+            f"El driver NVIDIA {gpu['driver_version']} es anterior al {DIAR_DRIVER_MIN}: "
+            "diarizar.py (torch con CUDA 13.0) correria en CPU, mas lento. "
+            "Transcribir no se ve afectado. Para usar la GPU, actualizar el driver.")
 
     cuda = gpu.get("cuda_version")
     if gpu["available"] and cuda:
@@ -349,8 +359,6 @@ def print_human(r: dict) -> None:
     print("  Modelo : " + (f"descargado ({dz['modelo_mb']} MB)" if dz["modelo_mb"]
                            else f"sin descargar (~{DIAR_MODELO_MB} MB)"))
     print("  torch  : " + (dz["torch"] or "sin instalar (~2,6 GB, entorno de uv)"))
-    if not dz["torch"]:
-        print("  git    : " + ("si" if dz["git"] else "NO (lo necesita la primera corrida)"))
     if dz["listo"]:
         print(f"  Listo; correria en {dz['device']}.")
     else:

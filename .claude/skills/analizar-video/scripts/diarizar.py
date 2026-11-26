@@ -1,20 +1,21 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "torch",
+#     "torch>=2.14",
 #     "numpy",
-#     # Nemotron-3-Diarization aun no sale en un release de PyPI. Commit fijo
-#     # (probado 2026-11-19) para que un cambio en main no rompa la skill.
-#     "transformers @ git+https://github.com/huggingface/transformers@297aafdb6dd64d63a335b3282bba6d35b4007836",
+#     # Primer release con Nemotron-3-Diarization (nemotron3_diarization).
+#     "transformers>=5.24.1",
 # ]
 #
 # [tool.uv.sources]
 # # Wheel con CUDA en Windows/Linux (tambien corre en CPU); en macOS, el de PyPI.
-# torch = { index = "pytorch-cu128", marker = "sys_platform != 'darwin'" }
+# # CUDA 13.0: driver NVIDIA 580 o mas nuevo (con uno mas viejo corre en CPU) y
+# # soporta las RTX 50. El indice cu128 dejo de recibir versiones en torch 2.11.
+# torch = { index = "pytorch-cu130", marker = "sys_platform != 'darwin'" }
 #
 # [[tool.uv.index]]
-# name = "pytorch-cu128"
-# url = "https://download.pytorch.org/whl/cu128"
+# name = "pytorch-cu130"
+# url = "https://download.pytorch.org/whl/cu130"
 # explicit = true
 # ///
 """Diarizacion (quien habla y cuando) con nvidia/Nemotron-3-Diarization.

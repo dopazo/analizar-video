@@ -42,3 +42,14 @@ esté en `visor/`.
   no se re-renderiza la lista 60 veces por segundo.
 - La lista está virtualizada: una reunión de una hora pinta ~30 líneas, no miles.
 - El servidor responde `Range` (206), sin lo cual el navegador no puede adelantar.
+
+## Dependencias
+
+Todas van fijas a una versión exacta. `@tanstack/react-virtual` queda en
+**3.13.12** a propósito: desde la 3.14 (virtual-core 3.19) el virtualizador
+retiene sus correcciones de scroll y pinta corrido respecto del `scrollTop`
+real, y eso choca con cómo `Transcripcion.tsx` lleva la lista a una fila
+(midiendo la fila en el DOM y corrigiendo en pasadas). Con 3.14 se pierde la
+fila que se estaba leyendo al cambiar el ancho del panel. Antes de subirla,
+repetir las pruebas de sincronía: saltos desde el mapa, J/L, clic en timestamp,
+vuelta desde el resumen, búsqueda y pantalla completa del panel en lectura libre.

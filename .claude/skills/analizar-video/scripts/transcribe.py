@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.9"
-# dependencies = ["faster-whisper>=1.0.0"]
+# dependencies = ["faster-whisper>=1.2.1", "ctranslate2>=4.9.1"]
 # ///
 """Transcribe video/audio local con faster-whisper.
 

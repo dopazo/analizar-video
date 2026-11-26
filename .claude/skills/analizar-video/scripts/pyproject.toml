@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Scripts de transcripcion y extraccion de frames para la skill analizar-video"
 requires-python = ">=3.9"
 dependencies = [
-    "faster-whisper>=1.0.0",
+    "faster-whisper>=1.2.1",
 ]
 
 [project.optional-dependencies]
@@ -18,14 +18,14 @@ gpu = [
 ]
 
 # diarizar.py (quien habla). Con uv no hace falta: el script trae su bloque
-# PEP 723 con torch CUDA y el commit de transformers fijado. Para tu propio
-# entorno, instala torch desde https://download.pytorch.org/whl/cu128.
+# PEP 723 con torch CUDA. Para tu propio entorno, instala torch desde
+# https://download.pytorch.org/whl/cu130 (el de PyPI en Windows es solo CPU).
 # El marcador evita que este extra rompa la resolucion del proyecto en Python
-# <3.11 (ese commit de transformers lo exige).
+# <3.11 (diarizar.py lo exige).
 diarizacion = [
-    "torch; python_version >= '3.11'",
+    "torch>=2.14; python_version >= '3.11'",
     "numpy; python_version >= '3.11'",
-    "transformers @ git+https://github.com/huggingface/transformers@297aafdb6dd64d63a335b3282bba6d35b4007836 ; python_version >= '3.11'",
+    "transformers>=5.24.1; python_version >= '3.11'",
 ]
 
 # Nota sobre CUDA 11:

@@ -13,6 +13,9 @@ export default defineConfig({
     outDir: "../.claude/skills/analizar-video/visor",
     emptyOutDir: true,
     target: "es2022",
+    // Un solo bundle a propósito: se sirve desde el disco local, no por red, y
+    // dividirlo no acelera nada. React DOM y Media Chrome ya pasan los 500 kB.
+    chunkSizeWarningLimit: 800,
   },
   server: {
     proxy: { "/api": PY, "/media": PY },

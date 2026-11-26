@@ -56,8 +56,8 @@ curl -sL https://github.com/dopazo/analizar-video/archive/refs/heads/main.tar.gz
 echo "Instalada en $destino/analizar-video"
 ```
 
-Después instala lo que pide: [uv](https://docs.astral.sh/uv/) y `ffmpeg` (git
-solo si vas a diarizar), y descarga el modelo de transcripción. El detalle por
+Después instala lo que pide: [uv](https://docs.astral.sh/uv/) y `ffmpeg`, y
+descarga el modelo de transcripción. El detalle por
 sistema, y sin permisos de administrador, está en [Requisitos](#requisitos) y
 [Modelo de transcripción](#modelo-de-transcripción). Para usarla sin agente, mira
 "Uso directo de los scripts" en [Detalles técnicos](#detalles-técnicos).
@@ -225,7 +225,7 @@ uv run ~/.claude/skills/analizar-video/scripts/check_env.py
 (Si la instalaste en un proyecto, desde ese proyecto:
 `uv run .claude/skills/analizar-video/scripts/check_env.py`.)
 
-Te dice si falta `ffmpeg` (o `git`, para diarizar), si hay GPU NVIDIA
+Te dice si falta `ffmpeg`, si hay GPU NVIDIA
 utilizable, qué modelos tienes descargados y qué nivel conviene según la VRAM
 libre.
 
@@ -246,10 +246,8 @@ libre.
 - **Diarización**: opcional.
   - La primera corrida descarga ~3 GB: PyTorch con CUDA, `transformers` y el
     modelo de ~400 MB.
-  - Necesita **git**: el soporte del modelo todavía no sale en una versión de
-    `transformers` en PyPI, así que `uv` la instala desde GitHub, y para
-    clonarla usa el `git` del equipo. Sin git falla con *Git executable not
-    found*. Solo hace falta la primera vez; nada más de la skill lo usa.
+  - PyTorch viene con CUDA 13.0: para usar la GPU pide un driver NVIDIA 580 o
+    más nuevo. Con uno anterior diariza igual, en CPU.
   - En una RTX 4060 Laptop diariza 35 minutos en 6 segundos con ~650 MiB de
     VRAM; en CPU no está probado.
 - **Navegador** para el visor: cualquiera sirve. Para que abra en una ventana
@@ -262,7 +260,6 @@ libre.
 |---|---|---|---|
 | uv | `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 \| iex"` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | ffmpeg | `winget install --id Gyan.FFmpeg -e` | `brew install ffmpeg` | `sudo apt install ffmpeg` |
-| git (solo para diarizar) | `winget install --id Git.Git -e` | `xcode-select --install` | `sudo apt install git` |
 
 El instalador de uv no pide permisos de administrador. `winget` a veces sí:
 si no los tienes, mira la alternativa más abajo.
@@ -270,9 +267,10 @@ si no los tienes, mira la alternativa más abajo.
 **No hace falta:**
 - **Node.js**: el visor viaja ya compilado dentro de la skill. Solo se usa para
   modificar su interfaz (`visor-ui/`).
-- **Permisos de administrador**: uv, Python, ffmpeg y git se pueden instalar en
-  tu carpeta de usuario. Para ffmpeg, el zip ya compilado descomprimido en una
-  carpeta propia y agregada al PATH de usuario; para git, PortableGit.
+- **Permisos de administrador**: uv, Python y ffmpeg se pueden instalar en tu
+  carpeta de usuario. Para ffmpeg, el zip ya compilado descomprimido en una
+  carpeta propia y agregada al PATH de usuario.
+- **git**: nada de la skill lo usa.
 - **Cuentas o servicios externos**: todo corre en local.
 
 `check_env.py` revisa todo esto y dice qué falta.

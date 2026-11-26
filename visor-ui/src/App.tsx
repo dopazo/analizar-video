@@ -95,12 +95,16 @@ export default function App() {
   }, [datos]);
   const durMapa = duracion || (lineas.length ? lineas[lineas.length - 1].end : 0);
 
-  const saltar = useCallback((t: number) => {
+  // Un salto desde la transcripción, el mapa o la búsqueda pide además volver
+  // a seguir al video. Uno desde un documento no: el clic ya está donde se lee,
+  // y en el resumen (que no va en orden) seguir lo haría saltar a otra parte.
+  const saltar = useCallback((t: number, seguir = true) => {
     const el = mediaRef.current;
     if (!el) return;
     el.currentTime = Math.max(0, t);
-    setPedirSeguir((n) => n + 1);
+    if (seguir) setPedirSeguir((n) => n + 1);
   }, []);
+  const saltarSinSeguir = useCallback((t: number) => saltar(t, false), [saltar]);
 
   const abrirNota = useCallback(() => {
     const el = mediaRef.current;
@@ -366,9 +370,10 @@ export default function App() {
         >
           {docActivo ? (
             <Documento
+              key={docActivo.tipo}
               doc={docActivo}
               mediaRef={mediaRef}
-              onSaltar={saltar}
+              onSaltar={saltarSinSeguir}
               pestanas={pestanas}
               acciones={botonPanel}
               consulta={consultaDiferida}
@@ -385,6 +390,7 @@ export default function App() {
             coincidencias={coincidencias}
             actual={actual}
             listaRef={listaRef}
+            mediaRef={mediaRef}
             onSaltar={saltar}
             pedirSeguir={pedirSeguir}
             acciones={botonPanel}

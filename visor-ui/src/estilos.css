@@ -388,9 +388,11 @@ kbd {
 
 /* ---------- transcripción ---------- */
 .lista {
-  flex: 1; min-height: 0; overflow-y: auto; padding: 8px 0 56px; overscroll-behavior: contain;
+  flex: 1; min-height: 0; overflow-y: auto; padding: 0 0 56px; overscroll-behavior: contain;
   mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 40px), transparent 100%);
 }
+/* Mientras se ubica en lo que suena al abrir: sin esto se ve pasar la lista. */
+.lista.posicionando { visibility: hidden; }
 .fila {
   position: relative; margin: 0 8px; padding: 3px 12px 3px 6px; border-radius: 8px;
   transition: background-color 0.3s var(--ease);

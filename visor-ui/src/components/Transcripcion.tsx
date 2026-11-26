@@ -1,7 +1,7 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import type { Coincidencia, LineaUI } from "../tipos";
-import { colorHablante, fmt } from "../lib/util";
+import { buscarIndice, colorHablante, fmt } from "../lib/util";
 import { Avatar } from "./MapaTiempo";
 
 interface Props {
@@ -11,25 +11,81 @@ interface Props {
   coincidencias: Coincidencia[];
   actual: number;
   listaRef: RefObject<HTMLDivElement | null>;
+  mediaRef: RefObject<HTMLMediaElement | null>;
   onSaltar: (t: number) => void;
-  /** se incrementa para pedir "vuelve a seguir al video" desde afuera (tecla .) */
+  /** se incrementa para pedir "vuelve a seguir al video" desde afuera (tecla ., un salto) */
   pedirSeguir: number;
   pestanas: ReactNode;
   /** botones a la derecha de la cabecera (pantalla completa del panel) */
   acciones?: ReactNode;
 }
 
+const ALTO_ESTIMADO = 72;
+/** Aire sobre la primera fila: va en el virtualizador y no en el CSS, para que sus cuentas calcen con el DOM. */
+const MARGEN_SUPERIOR = 8;
+
+/**
+ * Lo que la lista ya midió, para no partir de cero al volver desde otra
+ * pestaña (la transcripción se desmonta mientras se lee el resumen). Sin esto
+ * todas las filas vuelven al alto estimado, el destino calculado cae lejos de
+ * la fila real y la lista llega en dos o tres saltos.
+ */
+let memoria: { lineas: LineaUI[]; ancho: number; alto: number; medidas: VirtualItem[] } | null = null;
+
+/** Opciones de `llevar`. */
+interface Ir {
+  /** animar si el destino está cerca (si está lejos, siempre se salta directo) */
+  suave?: boolean;
+  /** dejar la fila a esta distancia del borde superior, en vez de centrada */
+  arriba?: number;
+  /** volver a posicionar aunque ya se esté yendo a esa fila */
+  forzar?: boolean;
+  /** se llama cuando la fila quedó en su lugar */
+  listo?: () => void;
+  /**
+   * Dar por terminado solo tras una pasada después de pintar (por omisión).
+   * Sin esto, una fila que ya está en su lugar antes de que React repinte con
+   * medidas nuevas (tras un cambio de ancho) se da por buena y luego se corre.
+   */
+  confirmar?: boolean;
+}
+
 export function Transcripcion({
-  lineas, hablantes, lineaActiva, coincidencias, actual, listaRef, onSaltar, pedirSeguir, pestanas, acciones,
+  lineas, hablantes, lineaActiva, coincidencias, actual, listaRef, mediaRef, onSaltar, pedirSeguir, pestanas, acciones,
 }: Props) {
   const [siguiendo, setSiguiendo] = useState(true);
-  const programatico = useRef(false);
+  const buscando = coincidencias.length > 0;
+
+  /** La línea del momento del video: la última que ya empezó (en un silencio, la anterior). */
+  const lineaEnCurso = useCallback(() => {
+    const t = mediaRef.current?.currentTime ?? 0;
+    return Math.max(0, buscarIndice(lineas, t, (l) => l.start));
+  }, [mediaRef, lineas]);
+
+  // Al montar: con lo medido la vez anterior (mismo texto), la lista abre ya
+  // centrada en lo que suena. Igual se oculta hasta quedar en su lugar: si
+  // llega en la primera pasada se muestra antes de pintar; si hacen falta más
+  // (filas que nunca se midieron), no se ve pasar.
+  const [inicio] = useState(() => {
+    const m = memoria && memoria.lineas === lineas ? memoria : null;
+    const objetivo = lineaEnCurso();
+    const it = m?.medidas[objetivo];
+    const offset = it && m ? Math.max(0, it.start + it.size / 2 - m.alto / 2) : objetivo * ALTO_ESTIMADO;
+    return { m, objetivo, offset };
+  });
+  const [posicionando, setPosicionando] = useState(true);
 
   const virt = useVirtualizer({
     count: lineas.length,
     getScrollElement: () => listaRef.current,
-    estimateSize: () => 72,
+    estimateSize: () => ALTO_ESTIMADO,
     overscan: 10,
+    paddingStart: MARGEN_SUPERIOR,
+    initialOffset: inicio.offset,
+    ...(inicio.m && {
+      initialMeasurementsCache: inicio.m.medidas,
+      initialRect: { width: inicio.m.ancho, height: inicio.m.alto },
+    }),
   });
 
   // Rangos de tokens resaltados por línea.
@@ -43,111 +99,239 @@ export function Transcripcion({
     return m;
   }, [coincidencias, actual]);
 
-  const correccion = useRef(0);
-  const irA = useCallback(
-    (idx: number, suave = true) => {
-      if (idx < 0) return;
-      programatico.current = true;
-      window.clearTimeout(correccion.current);
+  // --- Llevar la lista a una fila -------------------------------------------
+  //
+  // El virtualizador conoce el alto real solo de las filas que ya pintó; para
+  // el resto usa un estimado. Por eso el destino se ajusta midiendo la fila en
+  // el DOM, en pasadas (cada una pinta y mide filas nuevas), hasta que queda
+  // quieta. Solo se anima un salto corto hacia una fila ya pintada; mientras
+  // dura la animación, el virtualizador no corrige el scroll por cambios de
+  // alto (esa corrección es instantánea y cortaba la animación a medio camino).
+  // Al terminar, una pasada sin animación deja la fila exacta.
+  //
+  // Cada pedido nuevo invalida los anteriores (`gen`): un salto no compite con
+  // la corrección pendiente del anterior.
+  const gen = useRef(0);
+  const destino = useRef(-1);
+  const espera = useRef(0);
+  const cuadro = useRef(0);
+
+  const detener = useCallback(() => {
+    gen.current++;
+    destino.current = -1;
+    window.clearTimeout(espera.current);
+    cancelAnimationFrame(cuadro.current);
+    virt.shouldAdjustScrollPositionOnItemSizeChange = undefined;
+  }, [virt]);
+
+  const llevar = useCallback(
+    (idx: number, { suave = true, arriba, forzar = false, listo, confirmar = true }: Ir = {}) => {
       const lista = listaRef.current;
-      if (!lista) return;
-      // El virtualizador calcula con altos estimados para las filas que aún no
-      // pintó: en un salto largo (del inicio al minuto 20) el destino estimado
-      // puede quedar lejos de la fila real, que entonces ni siquiera existe en
-      // el DOM. Se ajusta en pasadas: mientras la fila no esté, se vuelve a
-      // pedir su posición (ya con más filas medidas); cuando está, se mide y se
-      // corrige lo que falte para centrarla, hasta que quede quieta.
-      // Un salto lejano va sin animación: animar 20 minutos de texto no aporta.
-      const destino0 = virt.getOffsetForIndex(idx, "center")?.[0];
-      const lejos = destino0 != null && Math.abs(destino0 - lista.scrollTop) > lista.clientHeight * 3;
-      const anim: ScrollBehavior = suave && !lejos ? "smooth" : "auto";
-      if (destino0 != null) lista.scrollTo({ top: destino0, behavior: anim });
-      let pasada = 0;
-      const ajustar = () => {
+      if (!lista || idx < 0 || idx >= lineas.length) return listo?.();
+      if (!forzar && destino.current === idx) return; // ya va hacia allá
+      detener();
+      const g = gen.current;
+      destino.current = idx;
+
+      /** Cuánto hay que mover el scroll para dejar la fila en su lugar; null si no está pintada. */
+      const error = () => {
         const fila = lista.querySelector<HTMLElement>(`[data-index="${idx}"]`);
-        let movio = false;
-        if (fila) {
-          const a = fila.getBoundingClientRect();
-          const b = lista.getBoundingClientRect();
-          const delta = a.top + a.height / 2 - (b.top + b.height / 2);
-          if (Math.abs(delta) > 6) {
-            lista.scrollTo({ top: lista.scrollTop + delta, behavior: pasada === 0 ? anim : "auto" });
-            movio = true;
-          }
-        } else {
-          const d = virt.getOffsetForIndex(idx, "center")?.[0];
-          if (d != null) lista.scrollTo({ top: d, behavior: "auto" });
-          movio = true;
-        }
-        if (movio && ++pasada < 8) correccion.current = window.setTimeout(ajustar, 60);
-        else correccion.current = window.setTimeout(() => (programatico.current = false), anim === "smooth" ? 450 : 50);
+        if (!fila) return null;
+        const a = fila.getBoundingClientRect();
+        const b = lista.getBoundingClientRect();
+        return a.top - b.top - (arriba ?? (b.height - a.height) / 2);
       };
-      correccion.current = window.setTimeout(ajustar, anim === "smooth" ? 380 : 60);
+      const fin = () => {
+        if (g !== gen.current) return;
+        destino.current = -1;
+        virt.shouldAdjustScrollPositionOnItemSizeChange = undefined;
+        listo?.();
+      };
+      let pasada = 0;
+      const corregir = () => {
+        if (g !== gen.current) return;
+        virt.shouldAdjustScrollPositionOnItemSizeChange = undefined;
+        const d = error();
+        const antes = lista.scrollTop;
+        if (d === null) {
+          const o = arriba == null
+            ? virt.getOffsetForIndex(idx, "center")?.[0]
+            : (virt.getOffsetForIndex(idx, "start")?.[0] ?? 0) - arriba;
+          if (o != null) lista.scrollTop = o;
+        } else if (Math.abs(d) > 1) {
+          lista.scrollTop = antes + d;
+        }
+        // Quieta: ya está en su lugar, o el scroll no da para más (las primeras
+        // y las últimas filas no alcanzan el centro).
+        const quieta = d !== null && (Math.abs(d) <= 1 || Math.abs(lista.scrollTop - antes) < 0.5);
+        if ((quieta && (pasada > 0 || !confirmar)) || ++pasada > 20) return fin();
+        // Dos cuadros: en el primero se pintan y se miden las filas nuevas.
+        cuadro.current = requestAnimationFrame(() => (cuadro.current = requestAnimationFrame(corregir)));
+      };
+
+      const d = error();
+      if (suave && d !== null && Math.abs(d) < lista.clientHeight) {
+        if (Math.abs(d) <= 1) return fin();
+        virt.shouldAdjustScrollPositionOnItemSizeChange = () => false;
+        const tras = () => {
+          if (g !== gen.current) return;
+          window.clearTimeout(espera.current);
+          corregir();
+        };
+        lista.addEventListener("scrollend", tras, { once: true });
+        espera.current = window.setTimeout(tras, 900); // por si no llega scrollend
+        lista.scrollTo({ top: lista.scrollTop + d, behavior: "smooth" });
+      } else {
+        corregir();
+      }
     },
-    [virt, listaRef],
+    [listaRef, lineas.length, virt, detener],
   );
+
+  // Lo que leen los manejadores que se registran una sola vez.
+  const estado = useRef({ siguiendo, buscando });
+  estado.current = { siguiendo, buscando };
+
+  // Abrir en lo que suena, antes de pintar.
+  useLayoutEffect(() => {
+    const id = window.setTimeout(() => setPosicionando(false), 600); // por si otro pedido lo reemplaza
+    // Sin confirmar: si las medidas guardadas ya la dejan en su lugar, la
+    // lista se muestra antes del primer cuadro.
+    llevar(inicio.objetivo, { suave: false, forzar: true, confirmar: false, listo: () => setPosicionando(false) });
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Al salir (otra pestaña), guardar lo medido para la vuelta.
+  const dims = useRef({ ancho: 0, alto: 0 });
+  useEffect(
+    () => () => {
+      detener();
+      if (dims.current.alto) memoria = { lineas, ...dims.current, medidas: virt.measurementsCache };
+    },
+    [lineas, virt, detener],
+  );
+
+  // La primera fila visible y su altura, tomada al leer (en cada scroll): es
+  // el ancla si cambia el ancho. Se toma antes y no al cambiar, porque para
+  // entonces los renglones ya se reacomodaron y la fila visible es otra.
+  const anclaLectura = useRef<{ idx: number; arriba: number } | null>(null);
+  const cuadroAncla = useRef(0);
+  const tomarAncla = () => {
+    cancelAnimationFrame(cuadroAncla.current);
+    cuadroAncla.current = requestAnimationFrame(() => {
+      const el = listaRef.current;
+      if (!el) return;
+      const tope = el.getBoundingClientRect().top;
+      const fila = [...el.querySelectorAll<HTMLElement>("[data-index]")].find((f) => f.getBoundingClientRect().bottom > tope);
+      anclaLectura.current = fila ? { idx: Number(fila.dataset.index), arriba: fila.getBoundingClientRect().top - tope } : null;
+    });
+  };
+  useEffect(() => () => cancelAnimationFrame(cuadroAncla.current), []);
 
   // Si cambia el ancho de la lista (pantalla completa del panel, ventana más
   // angosta), los renglones cambian de alto y las medidas quedan viejas: se
-  // re-mide y se vuelve a centrar lo que suena, sin animación (un scroll suave
-  // calculado con medidas viejas termina en otro lado).
-  const seguirRef = useRef({ siguiendo, lineaActiva });
-  seguirRef.current = { siguiendo, lineaActiva };
+  // re-mide todo y se vuelve a anclar. Siguiendo, a lo que suena; leyendo, a
+  // la primera fila visible, a la misma altura en que estaba.
   useEffect(() => {
     const el = listaRef.current;
     if (!el) return;
     let ancho = el.clientWidth;
-    let timers: number[] = [];
+    // El ancho puede cambiar en dos tiempos (el panel se expande y luego el
+    // navegador entra a pantalla completa): si el segundo llega mientras se
+    // ancla el primero, se conserva el ancla original y no la fila que en ese
+    // momento está a medio ubicar.
+    let previa: { idx: number; arriba?: number } | null = null;
     const ro = new ResizeObserver(() => {
+      dims.current = { ancho: el.clientWidth, alto: el.clientHeight };
       if (el.clientWidth === ancho) return;
       ancho = el.clientWidth;
-      timers.forEach(window.clearTimeout);
+      let ancla: { idx: number; arriba?: number } = { idx: -1 };
+      if (previa && destino.current === previa.idx) {
+        ancla = previa;
+      } else if (estado.current.siguiendo && !estado.current.buscando) {
+        ancla = { idx: lineaEnCurso() };
+      } else if (anclaLectura.current) {
+        ancla = anclaLectura.current;
+      }
+      previa = ancla;
+      // measure() olvida todos los altos, también los de las filas pintadas,
+      // que el virtualizador ya había medido con el ancho nuevo y que no
+      // volverán a avisar (no cambian más de tamaño): se miden de nuevo acá.
       virt.measure();
-      // Los altos reales llegan de a poco (cada fila se mide al pintarse): se
-      // corrige en varias pasadas cortas hasta que la posición se asienta.
-      timers = [0, 80, 200, 400, 700].map((ms) =>
-        window.setTimeout(() => {
-          const { siguiendo: s, lineaActiva: l } = seguirRef.current;
-          if (s && l >= 0) irA(l, false);
-        }, ms),
-      );
+      el.querySelectorAll<HTMLElement>("[data-index]").forEach((n) => virt.measureElement(n));
+      llevar(ancla.idx, { suave: false, arriba: ancla.arriba, forzar: true });
     });
     ro.observe(el);
-    return () => {
-      ro.disconnect();
-      timers.forEach(window.clearTimeout);
-    };
-  }, [listaRef, virt, irA]);
+    return () => ro.disconnect();
+  }, [listaRef, virt, llevar, lineaEnCurso]);
 
-  // Seguir al video mientras el usuario no se haya ido a leer otra parte.
+  // Seguir al video mientras el usuario no se haya ido a leer otra parte. El
+  // destino sale del tiempo del video y no de `lineaActiva`, que tras un salto
+  // sigue un cuadro en la línea vieja.
   useEffect(() => {
-    if (siguiendo && lineaActiva >= 0 && !coincidencias.length) irA(lineaActiva);
-  }, [lineaActiva, siguiendo, irA, coincidencias.length]);
+    if (siguiendo && lineaActiva >= 0 && !buscando) llevar(lineaEnCurso());
+  }, [lineaActiva, siguiendo, buscando, llevar, lineaEnCurso]);
+
+  // Un salto que no pasa por el visor (barra del reproductor, J/L, flechas)
+  // puede caer en un silencio, donde no hay línea activa: igual se lleva la
+  // lista a la línea anterior a ese punto.
+  useEffect(() => {
+    const el = mediaRef.current;
+    if (!el) return;
+    const alSaltar = () => {
+      if (estado.current.siguiendo && !estado.current.buscando) llevar(lineaEnCurso());
+    };
+    el.addEventListener("seeked", alSaltar);
+    return () => el.removeEventListener("seeked", alSaltar);
+  }, [mediaRef, llevar, lineaEnCurso]);
 
   // Al moverse entre resultados, llevar la lista a ese resultado.
   useEffect(() => {
     const c = coincidencias[actual];
-    if (c) irA(c.linea);
-  }, [actual, coincidencias, irA]);
+    if (c) llevar(c.linea);
+  }, [actual, coincidencias, llevar]);
 
+  // Pedido de volver a seguir (tecla ., un salto desde la lista o el mapa). El
+  // destino sale del tiempo del video, que ya cambió, y no de `lineaActiva`,
+  // que se actualiza un cuadro después: con ella la lista iba primero a la
+  // línea vieja, y durante una búsqueda le ganaba al resultado elegido. Solo
+  // pedidos nuevos, no el que ya venía al montar.
+  //
+  // Si se venía leyendo, volver a seguir cambia la cabecera (se va el botón
+  // "Seguir") y con ella el alto de la lista: el destino se calcula después de
+  // ese cambio, o la fila queda corrida y hay que corregirla con un rebote.
+  const pendiente = useRef<(() => void) | null>(null);
+  const seguir = (forzar = false) => {
+    const ir = () => llevar(lineaEnCurso(), { forzar });
+    if (estado.current.siguiendo) return ir();
+    pendiente.current = ir;
+    setSiguiendo(true);
+  };
+  useLayoutEffect(() => {
+    if (!siguiendo || !pendiente.current) return;
+    const ir = pendiente.current;
+    pendiente.current = null;
+    ir();
+  }, [siguiendo]);
+
+  const pedidoInicial = useRef(pedirSeguir);
   useEffect(() => {
-    if (pedirSeguir > 0) {
-      setSiguiendo(true);
-      irA(lineaActiva);
-    }
+    if (pedirSeguir !== pedidoInicial.current) seguir();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedirSeguir]);
 
-  // Cualquier gesto del usuario sobre la lista suspende el seguimiento.
+  // Cualquier gesto del usuario sobre la lista suspende el seguimiento y
+  // cancela lo que estuviera en camino (si no, la corrección pendiente de un
+  // salto devolvía la lista a su lugar en medio del gesto).
   const soltar = () => {
-    if (!programatico.current) setSiguiendo(false);
+    detener();
+    pendiente.current = null;
+    setSiguiendo(false);
   };
 
-  const volver = () => {
-    setSiguiendo(true);
-    irA(lineaActiva);
-  };
-  const puedeVolver = !siguiendo && lineaActiva >= 0;
+  const volver = () => seguir(true);
+  const puedeVolver = !siguiendo;
 
   if (!lineas.length) {
     return (
@@ -181,8 +365,9 @@ export function Transcripcion({
         </div>
       </div>
       <div
-        className="lista"
+        className={`lista${posicionando ? " posicionando" : ""}`}
         ref={listaRef}
+        onScroll={tomarAncla}
         onWheel={soltar}
         onTouchMove={soltar}
         onMouseDown={(e) => {
@@ -195,7 +380,11 @@ export function Transcripcion({
             {items.map((it) => {
               const ln = lineas[it.index];
               return (
-                <div key={it.key} data-index={it.index} ref={virt.measureElement}>
+                // flow-root: el margen de arriba de un cambio de hablante queda
+                // dentro de lo que se mide. Sin eso se escapaba del contenedor,
+                // el virtualizador medía cada turno 10 px más corto y lo pintado
+                // saltaba al desplazarse.
+                <div key={it.key} data-index={it.index} ref={virt.measureElement} style={{ display: "flow-root" }}>
                   <Fila
                     ln={ln}
                     color={colorHablante(hablantes, ln.speaker)}

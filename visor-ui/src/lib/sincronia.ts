@@ -41,18 +41,24 @@ export function useSincronia(
         if (wi >= 0 && t > ln.tiempos[wi][1] + 0.6) wi = -1;
       }
       const k = `${li}:${wi}`;
-      const desconectado = palabraEl.current && !palabraEl.current.isConnected;
-      if (k === clave.current && !desconectado) return;
+      // La marca se pierde sin que cambie la palabra si la fila se vuelve a
+      // pintar (sale y vuelve a entrar a la lista virtual, se cambia de pestaña)
+      // o si React reescribe el className del span (al cambiar la búsqueda).
+      const w0 = palabraEl.current;
+      const perdida = !!w0 && (!w0.isConnected || !w0.classList.contains("palabra-activa"));
+      if (k === clave.current && !perdida) return;
       clave.current = k;
-      palabraEl.current?.classList.remove("palabra-activa");
+      w0?.classList.remove("palabra-activa");
       palabraEl.current = null;
-      if (wi >= 0 && lista.current) {
-        const w = lista.current.querySelector(`[data-l="${li}"] [data-w="${wi}"]`);
+      if (wi >= 0) {
+        const w = lista.current?.querySelector(`[data-l="${li}"] [data-w="${wi}"]`);
         if (w) {
           w.classList.add("palabra-activa");
           palabraEl.current = w;
         } else {
-          clave.current = ""; // la línea aún no se pinta (virtualizada): reintentar
+          // La fila no está pintada (virtualizada, o la transcripción no está a
+          // la vista porque hay otra pestaña abierta): reintentar en el próximo cuadro.
+          clave.current = "";
         }
       }
     };

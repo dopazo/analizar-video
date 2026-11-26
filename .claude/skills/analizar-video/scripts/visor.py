@@ -35,6 +35,7 @@ tampoco sirve, recodifica a H.264/AAC. Se hace una vez y queda en caché.
 from __future__ import annotations
 
 import argparse
+import difflib
 import http.server
 import json
 import mimetypes
@@ -46,6 +47,7 @@ import subprocess
 import sys
 import threading
 import time
+import unicodedata
 import webbrowser
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -118,13 +120,49 @@ def leer_palabras(path: Path) -> list[tuple[float, float, str]]:
     return palabras
 
 
+def _clave(s: str) -> str:
+    """Una palabra para comparar: sin tildes, signos ni mayúsculas."""
+    s = unicodedata.normalize("NFD", s.lower())
+    return "".join(c for c in s if c.isalnum())
+
+
+def alinear_tiempos(tokens: list[str], propias: list[tuple[float, float, str]]) -> list[tuple[float, float]]:
+    """Tiempos para el texto corregido a partir de lo que oyó Whisper.
+
+    Las palabras que coinciden heredan su tiempo. Un tramo cambiado (Whisper
+    oyó "tablero" y se corrigió a "tablero de control") reparte en partes
+    iguales el tiempo del tramo original; una palabra agregada sin contraparte
+    queda en el hueco entre sus vecinas. Así una corrección de una palabra no
+    le quita el palabra a palabra a toda la línea.
+    """
+    sm = difflib.SequenceMatcher(a=[_clave(t) for t in tokens], b=[_clave(w) for _, _, w in propias],
+                                 autojunk=False)
+    tiempos: list[tuple[float, float] | None] = [None] * len(tokens)
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op == "equal":
+            for k in range(i2 - i1):
+                tiempos[i1 + k] = propias[j1 + k][:2]
+        elif i2 > i1 and j2 > j1:  # replace: el tramo de Whisper, repartido
+            a, b = propias[j1][0], propias[j2 - 1][1]
+            paso = (b - a) / (i2 - i1)
+            for k in range(i2 - i1):
+                tiempos[i1 + k] = (a + k * paso, a + (k + 1) * paso)
+    # Agregadas sin contraparte: entre el fin de la anterior y el inicio de la siguiente.
+    for k, t in enumerate(tiempos):
+        if t is None:
+            prev = tiempos[k - 1][1] if k > 0 and tiempos[k - 1] else propias[0][0]
+            sig = next((x[0] for x in tiempos[k + 1:] if x), propias[-1][1])
+            tiempos[k] = (prev, max(prev, sig))
+    return tiempos  # type: ignore[return-value]
+
+
 def asignar_palabras(lineas: list[dict], palabras: list[tuple[float, float, str]]) -> None:
     """Reparte las palabras con tiempo entre las líneas, por ventana temporal.
 
     La línea puede venir corregida (otro texto que el que oyó Whisper) o ser un
-    turno que junta varios segmentos. Si la cantidad de tokens coincide, se usa
-    el texto de la línea con los tiempos de Whisper; si no, la línea queda sin
-    palabras y la UI la resalta completa.
+    turno que junta varios segmentos. Se usa el texto de la línea con los
+    tiempos de Whisper: uno a uno si la cantidad de palabras coincide y, si no,
+    alineando ambas versiones (alinear_tiempos).
     """
     j = 0
     for i, ln in enumerate(lineas):
@@ -135,8 +173,10 @@ def asignar_palabras(lineas: list[dict], palabras: list[tuple[float, float, str]
                 propias.append(palabras[j])
             j += 1
         tokens = ln["text"].split()
-        if propias and len(tokens) == len(propias):
-            ln["words"] = [[round(a, 3), round(b, 3), t] for (a, b, _), t in zip(propias, tokens)]
+        if propias and tokens:
+            tiempos = ([w[:2] for w in propias] if len(tokens) == len(propias)
+                       else alinear_tiempos(tokens, propias))
+            ln["words"] = [[round(a, 3), round(b, 3), t] for (a, b), t in zip(tiempos, tokens)]
             ln["end"] = round(propias[-1][1], 3)
         if propias and "end" not in ln:
             ln["end"] = round(propias[-1][1], 3)

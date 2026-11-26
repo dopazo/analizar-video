@@ -8,6 +8,18 @@ function aSegundos(ts: string): number {
   return ts.split(":").reduce((acc, p) => acc * 60 + parseFloat(p), 0);
 }
 
+/**
+ * Centra `el` dentro del documento moviendo solo su scroll. scrollIntoView
+ * mueve además todo contenedor con scroll que haya arriba (la página, si la
+ * ventana es baja), y eso se veía como un salto de toda la interfaz.
+ */
+function centrar(raiz: HTMLElement, el: HTMLElement | Element, suave: boolean) {
+  const a = el.getBoundingClientRect();
+  const b = raiz.getBoundingClientRect();
+  const top = raiz.scrollTop + a.top - b.top - (b.height - a.height) / 2;
+  raiz.scrollTo({ top, behavior: suave ? "smooth" : "auto" });
+}
+
 function escapar(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
@@ -141,13 +153,19 @@ export function Documento({ doc, mediaRef, onSaltar, pestanas, acciones, consult
   const [siguiendo, setSiguiendo] = useState(doc.tipo !== "resumen");
   const [conTiempos, setConTiempos] = useState(false);
   const [buscando, setBuscando] = useState(false);
-  useEffect(() => setSiguiendo(doc.tipo !== "resumen"), [doc.tipo]);
   const seguirRef = useRef(siguiendo);
   seguirRef.current = siguiendo && !buscando;
-  const centrarActual = (suave = true) =>
-    cont.current?.querySelector(".bloque-actual")?.scrollIntoView({ block: "center", behavior: suave ? "smooth" : "auto" });
+  const marcarRef = useRef<() => void>(() => {});
+  const centrarActual = (suave = true) => {
+    const raiz = cont.current;
+    const fila = raiz?.querySelector<HTMLElement>(".bloque-actual");
+    if (raiz && fila) centrar(raiz, fila, suave);
+  };
   const volver = () => {
     setSiguiendo(true);
+    // Tras un salto, el bloque en curso aún es el de antes (timeupdate llega
+    // después): se actualiza primero para no ir al lugar viejo y luego al nuevo.
+    marcarRef.current();
     centrarActual();
   };
   // Solo los pedidos nuevos (no el valor que ya traía al abrir la pestaña).
@@ -184,13 +202,14 @@ export function Documento({ doc, mediaRef, onSaltar, pestanas, acciones, consult
       previo?.fila?.classList.remove("bloque-actual");
       actual?.b.classList.add("ts-actual");
       actual?.fila?.classList.add("bloque-actual");
-      if (previo && seguirRef.current) actual?.fila?.scrollIntoView({ block: "center", behavior: "smooth" });
+      if (previo && seguirRef.current && actual?.fila) centrar(raiz, actual.fila, true);
       previo = actual;
     };
     marcar();
+    marcarRef.current = marcar;
     // En el índice y en las notas se abre donde va el video; un resumen, arriba.
     const inicial = previo as (typeof botones)[number] | null; // marcar() lo asignó
-    if (doc.tipo !== "resumen") inicial?.fila?.scrollIntoView({ block: "center" });
+    if (doc.tipo !== "resumen" && inicial?.fila) centrar(raiz, inicial.fila, false);
     el.addEventListener("timeupdate", marcar);
     el.addEventListener("seeked", marcar);
     return () => {
@@ -217,7 +236,7 @@ export function Documento({ doc, mediaRef, onSaltar, pestanas, acciones, consult
     raiz.querySelectorAll(".hit-actual").forEach((x) => x.classList.remove("hit-actual"));
     const marcas = raiz.querySelectorAll<HTMLElement>(`mark.hit-doc[data-m="${actual}"]`);
     marcas.forEach((x) => x.classList.add("hit-actual"));
-    marcas[0]?.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (marcas[0]) centrar(raiz, marcas[0], true);
   }, [actual, pasada]);
 
   const vacio = doc.tipo === "notas" && !doc.cantidad;

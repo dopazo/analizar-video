@@ -140,7 +140,8 @@ título del capítulo con una miniatura del video, como en YouTube. Con `C` la
 transcripción aparece como subtítulos, también en pantalla completa. Con `N`
 anotas algo en el momento actual del video: queda en `<video>_notas.md` y en una
 pestaña Notas, y el agente las lee cuando vuelves a trabajar sobre ese video.
-`Ctrl+F` busca en lo que se dijo. El panel
+`Ctrl+F` busca en lo que se dijo, `1`–`4` cambian de pestaña y `↑`/`↓` desplazan
+el texto; bajo el video están todos los atajos, agrupados. El panel
 de texto tiene su propia pantalla completa para leer el resumen con renglones
 largos, con una barra flotante para seguir controlando el video. Un botón de
 recargar trae el resumen, índice o hablantes que se hayan escrito con el visor

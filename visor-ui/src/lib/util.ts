@@ -80,3 +80,28 @@ export function colorHablante(hablantes: string[], h: string | null): number {
   const i = hablantes.indexOf(h);
   return i < 0 ? 0 : (i % 8) + 1;
 }
+
+/** Destino pendiente de cada contenedor mientras dura un desplazamiento suave. */
+const destinos = new WeakMap<HTMLElement, number>();
+
+/**
+ * Desplaza `el` en `dy` px (↑/↓). Varias pulsaciones seguidas suman sobre el
+ * destino pendiente y no sobre la posición a medio camino: si no, cada una
+ * cortaba la animación anterior y la distancia se perdía. Con la tecla
+ * mantenida (`repetida`) va sin animación, que a 30 pulsaciones por segundo
+ * solo se vería trabada.
+ */
+export function desplazar(el: HTMLElement, dy: number, repetida: boolean): void {
+  const max = el.scrollHeight - el.clientHeight;
+  const desde = destinos.get(el) ?? el.scrollTop;
+  const top = Math.max(0, Math.min(max, desde + dy));
+  // Ya en el borde: no habrá scroll ni scrollend que limpie el destino.
+  if (repetida || Math.abs(top - el.scrollTop) < 1) {
+    destinos.delete(el);
+    el.scrollTop = top;
+    return;
+  }
+  destinos.set(el, top);
+  el.addEventListener("scrollend", () => destinos.delete(el), { once: true });
+  el.scrollTo({ top, behavior: "smooth" });
+}

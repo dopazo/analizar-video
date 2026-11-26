@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { fmt } from "../lib/util";
 
@@ -25,19 +25,77 @@ export function Flotante({ children, destino }: { children: ReactNode; destino: 
 export const ES_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 export const TECLA_BUSCAR = ES_MAC ? "⌘F" : "Ctrl+F";
 
-/** Lista única de atajos: la usan el pie de página y el flotante de pantalla completa. */
-export const ATAJOS: [string, string][] = [
-  ["Espacio", "reproducir / pausar"],
-  ["J / L", "−10 s / +10 s"],
-  ["← / →", "−5 s / +5 s"],
-  ["N", "nota en este momento"],
-  [TECLA_BUSCAR, "buscar en la pestaña abierta"],
-  ["P", "video en miniatura"],
-  ["C", "subtítulos"],
-  [".", "volver a lo que suena"],
-  ["M", "silenciar"],
-  ["Esc", "cerrar / salir"],
-];
+interface GrupoAtajos {
+  titulo: string;
+  atajos: [string, string][];
+}
+
+/**
+ * Lista única de atajos, por grupos: la usan el pie bajo el video y el
+ * flotante de pantalla completa. `pestanas` es cuántas hay (1 a 4): Resumen,
+ * Índice y Notas solo aparecen si existen, y el número es su posición.
+ */
+export function gruposAtajos(pestanas: number): GrupoAtajos[] {
+  return [
+    {
+      titulo: "Reproducción",
+      atajos: [
+        ["Espacio", "reproducir / pausar"],
+        ["J / L", "−10 s / +10 s"],
+        ["← / →", "−5 s / +5 s"],
+        ["M", "silenciar"],
+        ["F", "pantalla completa"],
+        ["C", "subtítulos"],
+        ["P", "video en miniatura"],
+      ],
+    },
+    {
+      titulo: "Texto",
+      atajos: [
+        ...(pestanas > 1 ? [[`1 – ${pestanas}`, "cambiar de pestaña"] as [string, string]] : []),
+        ["↑ / ↓", "desplazar"],
+        [".", "volver a lo que suena"],
+        ["Clic", "saltar a esa palabra"],
+      ],
+    },
+    {
+      titulo: "Herramientas",
+      atajos: [
+        [TECLA_BUSCAR, "buscar en la pestaña"],
+        ["N", "nota en este momento"],
+        ["?", "mostrar atajos"],
+        ["Esc", "cerrar / salir"],
+      ],
+    },
+  ];
+}
+
+/**
+ * Los atajos por grupo. Bajo el video van en `filas` (cada grupo una línea, sus
+ * atajos uno tras otro), para no robarle alto al video; en el flotante, en
+ * `columnas`, uno por renglón.
+ */
+export function ListaAtajos({ pestanas, className, forma, ref }: {
+  pestanas: number; className: string; forma: "filas" | "columnas"; ref?: Ref<HTMLDivElement>;
+}) {
+  return (
+    <div ref={ref} className={`${className} atajos-${forma}`}>
+      {gruposAtajos(pestanas).map((g) => (
+        <section key={g.titulo} className="atajos-grupo" aria-label={g.titulo}>
+          <h3>{g.titulo}</h3>
+          <dl>
+            {g.atajos.map(([k, d]) => (
+              <div key={k}>
+                <dt><kbd>{k}</kbd></dt>
+                <dd>{d}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ))}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 
@@ -119,19 +177,10 @@ export function Aviso({ texto, accion, elevado }: { texto: string; accion?: Reac
 // ---------------------------------------------------------------------------
 
 /** Atajos, plegados en una pastilla abajo a la izquierda; se abren con clic o con "?". */
-export function AtajosFlotantes({ abierto, alternar }: { abierto: boolean; alternar: () => void }) {
+export function AtajosFlotantes({ abierto, alternar, pestanas }: { abierto: boolean; alternar: () => void; pestanas: number }) {
   return (
     <div className={`atajos-flotantes${abierto ? " abierto" : ""}`}>
-      {abierto && (
-        <dl className="atajos-lista">
-          {ATAJOS.map(([k, d]) => (
-            <div key={k}>
-              <dt><kbd>{k}</kbd></dt>
-              <dd>{d}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
+      {abierto && <ListaAtajos pestanas={pestanas} className="atajos-lista" forma="columnas" />}
       <button className="atajos-pastilla" onClick={alternar} title="Atajos de teclado (?)">
         <kbd>?</kbd> {abierto ? "Ocultar atajos" : "Atajos"}
       </button>

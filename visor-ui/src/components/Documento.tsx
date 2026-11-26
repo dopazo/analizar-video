@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Marked, type Tokens } from "marked";
-import type { Documento as Doc } from "../tipos";
-import { normalizar } from "../lib/util";
+import type { Desplazar, Documento as Doc } from "../tipos";
+import { PASO_TECLADO } from "./Transcripcion";
+import { desplazar, normalizar } from "../lib/util";
 
 /** "01:02:03.5" | "02:03" → segundos */
 function aSegundos(ts: string): number {
@@ -86,6 +87,8 @@ interface Props {
   onResultados: (n: number) => void;
   /** se incrementa para pedir "vuelve a seguir al video" desde afuera (tecla .) */
   pedirSeguir: number;
+  /** donde se deja cómo desplazar el documento con ↑/↓ */
+  desplazarRef: RefObject<Desplazar | null>;
 }
 
 /**
@@ -143,7 +146,7 @@ function resaltar(raiz: HTMLElement, consulta: string): number {
   return m;
 }
 
-export function Documento({ doc, mediaRef, onSaltar, pestanas, acciones, consulta, actual, onResultados, pedirSeguir }: Props) {
+export function Documento({ doc, mediaRef, onSaltar, pestanas, acciones, consulta, actual, onResultados, pedirSeguir, desplazarRef }: Props) {
   const html = useMemo(() => marked.parse(doc.md, { async: false }) as string, [doc.md]);
   const cont = useRef<HTMLDivElement>(null);
 
@@ -175,6 +178,17 @@ export function Documento({ doc, mediaRef, onSaltar, pestanas, acciones, consult
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedirSeguir]);
   const soltar = () => setSiguiendo(false);
+
+  // ↑/↓ (los atiende App): desplazar es leer, así que deja de seguir al video.
+  useEffect(() => {
+    desplazarRef.current = (dir, repetida) => {
+      setSiguiendo(false);
+      if (cont.current) desplazar(cont.current, dir * PASO_TECLADO, repetida);
+    };
+    return () => {
+      desplazarRef.current = null;
+    };
+  }, [desplazarRef]);
 
   // Marca el último timestamp ya alcanzado por el video (en un índice, el
   // capítulo en curso). timeupdate llega ~4 veces por segundo: suficiente.

@@ -124,7 +124,13 @@ export function Reproductor({ url, nombre, audio, mediaRef, bajoSlider, capitulo
     <div className="escenario">
       {!audio && <canvas ref={lienzo} className="ambiente" width={32} height={18} aria-hidden />}
     <div className="reproductor-bloque">
-      <MediaController id={ID} className={audio ? "reproductor solo-audio" : "reproductor"} audio={audio || undefined}>
+      {/* ↑/↓ no cambian el volumen: en el visor desplazan el texto (lo atiende App). */}
+      <MediaController
+        id={ID}
+        className={audio ? "reproductor solo-audio" : "reproductor"}
+        audio={audio || undefined}
+        hotkeys="noarrowup noarrowdown"
+      >
         {audio ? (
           <>
             <div className="portada-audio" aria-hidden>

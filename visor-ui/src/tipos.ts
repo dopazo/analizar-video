@@ -49,3 +49,9 @@ export interface Coincidencia {
   desde: number; // índice de token
   hasta: number; // índice de token, inclusivo
 }
+
+/**
+ * Desplaza el panel de texto abierto con ↑/↓ (dir -1 o 1). Lo registra la
+ * transcripción o el documento; cuenta como gesto del usuario (lectura libre).
+ */
+export type Desplazar = (dir: number, repetida: boolean) => void;

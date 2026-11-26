@@ -1,7 +1,7 @@
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
-import type { Coincidencia, LineaUI } from "../tipos";
-import { buscarIndice, colorHablante, fmt } from "../lib/util";
+import type { Coincidencia, Desplazar, LineaUI } from "../tipos";
+import { buscarIndice, colorHablante, desplazar, fmt } from "../lib/util";
 import { Avatar } from "./MapaTiempo";
 
 interface Props {
@@ -15,6 +15,8 @@ interface Props {
   onSaltar: (t: number) => void;
   /** se incrementa para pedir "vuelve a seguir al video" desde afuera (tecla ., un salto) */
   pedirSeguir: number;
+  /** donde se deja cómo desplazar la lista con ↑/↓ */
+  desplazarRef: RefObject<Desplazar | null>;
   pestanas: ReactNode;
   /** botones a la derecha de la cabecera (pantalla completa del panel) */
   acciones?: ReactNode;
@@ -23,6 +25,8 @@ interface Props {
 const ALTO_ESTIMADO = 72;
 /** Aire sobre la primera fila: va en el virtualizador y no en el CSS, para que sus cuentas calcen con el DOM. */
 const MARGEN_SUPERIOR = 8;
+/** Lo que avanza cada ↑/↓: unos tres renglones. */
+export const PASO_TECLADO = 80;
 
 /**
  * Lo que la lista ya midió, para no partir de cero al volver desde otra
@@ -51,7 +55,7 @@ interface Ir {
 }
 
 export function Transcripcion({
-  lineas, hablantes, lineaActiva, coincidencias, actual, listaRef, mediaRef, onSaltar, pedirSeguir, pestanas, acciones,
+  lineas, hablantes, lineaActiva, coincidencias, actual, listaRef, mediaRef, onSaltar, pedirSeguir, desplazarRef, pestanas, acciones,
 }: Props) {
   const [siguiendo, setSiguiendo] = useState(true);
   const buscando = coincidencias.length > 0;
@@ -331,6 +335,20 @@ export function Transcripcion({
   };
 
   const volver = () => seguir(true);
+
+  // ↑/↓ (los atiende App): desplazar es leer, así que también suspende el
+  // seguimiento, igual que la rueda.
+  useEffect(() => {
+    desplazarRef.current = (dir, repetida) => {
+      detener();
+      pendiente.current = null;
+      setSiguiendo(false);
+      if (listaRef.current) desplazar(listaRef.current, dir * PASO_TECLADO, repetida);
+    };
+    return () => {
+      desplazarRef.current = null;
+    };
+  }, [desplazarRef, listaRef, detener]);
   const puedeVolver = !siguiendo;
 
   if (!lineas.length) {

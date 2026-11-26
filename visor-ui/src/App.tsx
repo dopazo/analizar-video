@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { Datos } from "./tipos";
 import { buscar, prepararLineas } from "./lib/util";
 import { useSincronia } from "./lib/sincronia";
@@ -9,10 +9,10 @@ import { Leyenda, MapaTiempo } from "./components/MapaTiempo";
 import { Transcripcion } from "./components/Transcripcion";
 import { Documento } from "./components/Documento";
 import {
-  ATAJOS, Aviso, AtajosFlotantes, Buscador, CompositorNota, Flotante, useElementoPantallaCompleta,
+  Aviso, AtajosFlotantes, ListaAtajos, Buscador, CompositorNota, Flotante, useElementoPantallaCompleta,
 } from "./components/Flotantes";
 import { fmt } from "./lib/util";
-import type { Documento as Doc } from "./tipos";
+import type { Desplazar, Documento as Doc } from "./tipos";
 
 export default function App() {
   const [datos, setDatos] = useState<Datos | null>(null);
@@ -31,6 +31,10 @@ export default function App() {
   const columnaTexto = useRef<HTMLElement>(null);
   const [panelCompleto, alternarPanel] = usePanelCompleto(columnaTexto);
   const fsEl = useElementoPantallaCompleta();
+  // Los atajos van bajo el video si caben enteros; si no (ventana baja o
+  // angosta), se ocultan y queda la pastilla "? Atajos", que los abre flotando.
+  const pie = useRef<HTMLDivElement>(null);
+  const pieCabe = usePieCabe(pie, datos);
   const enPantallaCompleta = panelCompleto || !!fsEl;
   const buscadorFlotante = useRef<HTMLInputElement>(null);
   const [buscarFlotante, setBuscarFlotante] = useState(false);
@@ -181,8 +185,12 @@ export default function App() {
   );
 
   // Lo que el manejador de teclas necesita leer sin volver a registrarse.
-  const estado = useRef({ enPantallaCompleta, notaAbierta: !!nota, abrirNota });
-  estado.current = { enPantallaCompleta, notaAbierta: !!nota, abrirNota };
+  // Pestañas en el orden en que se ven: el número de cada una es su atajo.
+  const tiposPestana = useMemo(() => ["transcripcion", ...(datos?.documentos ?? []).map((d) => d.tipo)], [datos]);
+  // El panel abierto (transcripción o documento) deja acá cómo desplazarse con ↑/↓.
+  const desplazarRef = useRef<Desplazar | null>(null);
+  const estado = useRef({ enPantallaCompleta, panelCompleto, notaAbierta: !!nota, abrirNota, tiposPestana });
+  estado.current = { enPantallaCompleta, panelCompleto, notaAbierta: !!nota, abrirNota, tiposPestana };
 
   // Atajos globales (fuera de campos de texto).
   useEffect(() => {
@@ -215,11 +223,40 @@ export default function App() {
         estado.current.abrirNota();
         return;
       }
+      // 1 a 4: pestañas, por posición. Por e.code y no e.key: en teclados donde
+      // los números van con Mayúscula (AZERTY) e.key es "&", "é"...
+      const num = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
+      if (num) {
+        const tipo = estado.current.tiposPestana[Number(num[1]) - 1];
+        if (tipo) {
+          e.preventDefault();
+          setPestana(tipo);
+        }
+        return;
+      }
       const k = e.key.toLowerCase();
+      // ↑/↓ desplazan el texto abierto (Media Chrome tiene apagado su volumen
+      // con esas teclas). No con el video en pantalla completa: ahí no se ve.
+      if (k === "arrowup" || k === "arrowdown") {
+        if (document.fullscreenElement?.closest("media-controller")) return;
+        e.preventDefault();
+        desplazarRef.current?.(k === "arrowup" ? -1 : 1, e.repeat);
+        return;
+      }
       // Con el foco dentro del reproductor, Media Chrome ya atiende estas teclas:
       // atenderlas también acá las aplicaría dos veces (play y pausa a la vez).
-      const propiasDelReproductor = [" ", "k", "m", "f", "c", "arrowleft", "arrowright", "arrowup", "arrowdown"];
+      const propiasDelReproductor = [" ", "k", "m", "f", "c", "arrowleft", "arrowright"];
       if ((e.target as HTMLElement)?.closest("media-controller") && propiasDelReproductor.includes(k)) return;
+      if (k === "f") {
+        // Pantalla completa del video, también con el foco fuera del reproductor.
+        // Con el panel de texto a pantalla completa el video no está a la vista.
+        const mc = document.getElementById("reproductor");
+        if (!mc || estado.current.panelCompleto) return;
+        e.preventDefault();
+        const salir = document.fullscreenElement === mc;
+        mc.dispatchEvent(new CustomEvent(salir ? "mediaexitfullscreenrequest" : "mediaenterfullscreenrequest", { composed: true, bubbles: true }));
+        return;
+      }
       if (k === " " || k === "k") {
         e.preventDefault();
         if (el.paused) void el.play();
@@ -265,9 +302,10 @@ export default function App() {
   const docActivo = docs.find((d) => d.tipo === pestana) ?? null;
   const pestanas = (
     <div className="pestanas" role="tablist">
-      {[{ tipo: "transcripcion", titulo: "Transcripción" }, ...docs].map((p) => (
+      {[{ tipo: "transcripcion", titulo: "Transcripción" }, ...docs].map((p, i) => (
         <button
           key={p.tipo}
+          title={`${p.titulo} (${i + 1})`}
           role="tab"
           aria-selected={pestana === p.tipo}
           className={`pestana${pestana === p.tipo ? " activa" : ""}`}
@@ -353,15 +391,7 @@ export default function App() {
             }
           />
           <Leyenda lineas={lineas} hablantes={datos.hablantes} lineaActiva={lineaActiva} />
-          <p className="atajos">
-            {ATAJOS.slice(0, -1).map(([k, d], i) => (
-              <span key={k}>
-                {i > 0 && " · "}
-                <kbd>{k}</kbd> {d}
-              </span>
-            ))}
-            {" · clic en una palabra para saltar"}
-          </p>
+          <ListaAtajos ref={pie} pestanas={tiposPestana.length} className={`atajos${pieCabe ? "" : " no-cabe"}`} forma="filas" />
         </section>
         <section
           ref={columnaTexto}
@@ -380,6 +410,7 @@ export default function App() {
               actual={actual}
               onResultados={setTotalDoc}
               pedirSeguir={pedirSeguir}
+              desplazarRef={desplazarRef}
             />
           ) : (
           <Transcripcion
@@ -393,6 +424,7 @@ export default function App() {
             mediaRef={mediaRef}
             onSaltar={saltar}
             pedirSeguir={pedirSeguir}
+            desplazarRef={desplazarRef}
             acciones={botonPanel}
           />
           )}
@@ -429,8 +461,8 @@ export default function App() {
             onEscape={cerrarBusqueda}
           />
         )}
-        {(enPantallaCompleta || atajosAbiertos) && (
-          <AtajosFlotantes abierto={atajosAbiertos} alternar={() => setAtajosAbiertos((v) => !v)} />
+        {(enPantallaCompleta || atajosAbiertos || !pieCabe) && (
+          <AtajosFlotantes abierto={atajosAbiertos} alternar={() => setAtajosAbiertos((v) => !v)} pestanas={tiposPestana.length} />
         )}
       </Flotante>
     </div>
@@ -507,4 +539,30 @@ function usePresencia(): boolean {
     };
   }, []);
   return conectado;
+}
+
+/**
+ * Si el pie de atajos cabe entero en la ventana. Se mide con el pie oculto por
+ * visibility (sigue ocupando su lugar), así que no oscila al ocultarlo; con
+ * display: none (pantallas angostas, por CSS) cuenta como que no cabe.
+ */
+function usePieCabe(pie: RefObject<HTMLDivElement | null>, datos: unknown): boolean {
+  const [cabe, setCabe] = useState(true);
+  useLayoutEffect(() => {
+    const medir = () => {
+      const el = pie.current;
+      if (!el) return;
+      setCabe(el.offsetParent !== null && el.getBoundingClientRect().bottom <= window.innerHeight);
+    };
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(document.documentElement);
+    if (pie.current?.parentElement) ro.observe(pie.current.parentElement);
+    window.addEventListener("resize", medir);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", medir);
+    };
+  }, [pie, datos]); // el pie existe recién con los datos cargados
+  return cabe;
 }

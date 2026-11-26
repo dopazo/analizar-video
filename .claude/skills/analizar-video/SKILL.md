@@ -101,7 +101,9 @@ botón CC) muestra la transcripción como subtítulos, también en pantalla
 completa. El panel de texto tiene su propia pantalla completa, para leer el
 resumen con renglones largos mientras el video sigue sonando y se maneja desde
 una barra flotante. `Ctrl+F` (`⌘F` en Mac) busca en la transcripción, en vez
-del buscador del navegador.
+del buscador del navegador. Las teclas `1` a `4` cambian de pestaña
+(Transcripción, Resumen, Índice, Notas, en el orden en que aparezcan), `F` pone
+el video en pantalla completa y `↑`/`↓` desplazan el texto.
 
 **Notas del usuario.** Con la tecla `N` el usuario anota algo en el momento
 actual del video (el video se pausa mientras escribe). Las notas se guardan en

@@ -23,9 +23,9 @@ encadenes pasos por tu cuenta.
 | 2b | **Diarizar** (`diarizar.py`) | Reuniones con varias personas, si el usuario quiere saber quién dijo qué. Requiere haber transcrito con `--words` |
 | 3 | **Corregir términos y nombrar hablantes** | Siempre después de transcribir: corre `revisar_terminos.py` y revisa la tabla. Si hubo diarización, en el mismo paso se proponen nombres para `speaker_N` (ver abajo) |
 | 4 | **Responder / resumir** | Según lo pedido. Resumir o explicar incluye el **sondeo visual** (ver abajo), no es un paso aparte. Al resumir, mencionar que queda un `.md` en `<video>_analisis/` |
-| 5 | **Índice de temas** | En videos largos, donde navegar el transcript se vuelve incómodo |
+| 5 | **Índice de temas** | En videos largos, donde navegar el transcript se vuelve incómodo, y **siempre antes de abrir el visor si aún no hay índice** (ver "Antes de abrir el visor") |
 | 6 | **Frames de apoyo** | Si la pregunta toca contenido visual, o si un walkthrough gana con capturas |
-| 7 | **Visor** (`visor.py`) | **Al cerrar**: cuando ya se respondió lo que el usuario pedía (y hay resumen o índice, si se pidieron), ofrécelo una vez como último paso. También si pide ver o revisar la grabación |
+| 7 | **Visor** (`visor.py`) | **Al cerrar**: cuando ya se respondió lo que el usuario pedía (y hay resumen o índice, si se pidieron), ofrécelo una vez como último paso. También si pide ver o revisar la grabación. Si no hay índice, la oferta incluye armarlo primero |
 
 Reglas para que la guía no sea ruido: **una sugerencia a la vez**; no repetir
 una que el usuario ya declinó en la sesión; la primera vez sobre un video se
@@ -115,6 +115,25 @@ Por eso conviene ofrecer el visor al final, cuando ya está todo escrito:
 
 > ¿Quieres abrirlo en el visor? Video y transcripción sincronizados, con el
 > resumen y el índice en pestañas.
+
+**Antes de abrir el visor: proponer el índice.** Busca
+`<video>_analisis/<video>_indice_*.md`. Si no hay, el visor abre sin capítulos:
+la barra es una sola franja y no hay pestaña Índice. El usuario no sabe qué
+trae la grabación más allá de lo que ya leyó, y justo el índice es lo que le da
+el mapa para recorrerla, así que **propónlo antes de abrir**, tanto al ofrecer
+el visor al cierre como cuando el usuario pide abrirlo. Una sola pregunta, con
+las dos salidas:
+
+> Antes de abrirlo: todavía no hay índice de temas. Si lo armo, la barra del
+> video queda partida en capítulos (al pasar el mouse se ve el tema y una
+> miniatura) y en la pestaña Índice cada tema lleva a su momento. ¿Lo armo y
+> abro el visor, o lo abro así?
+
+Si acepta, escribe el índice (formato en `resumir_video.md`) y recién entonces
+lanza el visor. Si prefiere abrirlo así, ábrelo sin insistir y no vuelvas a
+proponerlo en la sesión. Si el visor ya está abierto cuando armas el índice,
+basta con que el usuario pulse el botón de recargar. No hace falta proponerlo
+en grabaciones de pocos minutos (menos de ~5), donde no hay temas que separar.
 
 Lánzalo **en background** y entrégale al usuario la URL que imprime. Se abre
 en una **ventana propia** (el modo app de Edge, Chrome o Brave: sin pestañas ni

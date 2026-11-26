@@ -76,7 +76,26 @@ El objetivo es que alguien pueda reproducir el proceso sin ver el video.
 
 ## Índice de temas (distinto de un resumen)
 
-Solo bajo demanda. Es una tabla de capítulos —tema y timestamp de inicio— para
-navegar videos largos y ubicar dónde extraer un frame. Se guarda en
-`<video>_analisis/<video>_indice_yymmdd_hhmmss.md`. No lo generes automáticamente junto con el
-resumen.
+Bajo demanda, o cuando el usuario acepta armarlo antes de abrir el visor (ver
+SKILL.md). Es una tabla de capítulos —tema y timestamp de inicio— para navegar
+videos largos y ubicar dónde extraer un frame. Se guarda en
+`<video>_analisis/<video>_indice_yymmdd_hhmmss.md`. No lo generes
+automáticamente junto con el resumen.
+
+Formato: una línea por capítulo, con el inicio como `[HH:MM:SS]` y el tema en
+pocas palabras. El visor convierte **cada línea con timestamp** en un capítulo
+de la barra, con el resto de la línea como título, así que no agregues otros
+timestamps (subtemas, citas) dentro del índice: para eso está el resumen.
+
+```markdown
+# Índice de temas
+
+| Inicio | Tema |
+|---|---|
+| [00:00:00] | Agenda y objetivo de la reunión |
+| [00:01:35] | Cómo se despacha hoy |
+| [00:05:30] | Tablero de operaciones |
+```
+
+Corta donde cambia el tema de verdad, no a intervalos fijos: cada capítulo es
+un tramo de la barra y un punto al que el usuario va a querer saltar.

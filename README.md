@@ -145,7 +145,8 @@ de texto tiene su propia pantalla completa para leer el resumen con renglones
 largos, con una barra flotante para seguir controlando el video. Un botón de
 recargar trae el resumen, índice o hablantes que se hayan escrito con el visor
 abierto, sin perder el punto del video. El agente lo ofrece al final, cuando ya
-está todo escrito, y el servidor se apaga solo al cerrar la ventana: no quedan
+está todo escrito; si todavía no hay índice, antes de abrirlo te propone armarlo,
+para que la barra llegue partida en capítulos. El servidor se apaga solo al cerrar la ventana: no quedan
 procesos corriendo por detrás. Todo local, sin instalar nada más: la interfaz
 viaja compilada dentro de la skill.
 

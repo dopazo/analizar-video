@@ -176,10 +176,14 @@ export function Aviso({ texto, accion, elevado }: { texto: string; accion?: Reac
 
 // ---------------------------------------------------------------------------
 
-/** Atajos, plegados en una pastilla abajo a la izquierda; se abren con clic o con "?". */
-export function AtajosFlotantes({ abierto, alternar, pestanas }: { abierto: boolean; alternar: () => void; pestanas: number }) {
+/** Atajos plegados en una pastilla; se abren con clic o con "?". */
+export function AtajosFlotantes({ abierto, alternar, pestanas, enColumna }: {
+  abierto: boolean; alternar: () => void; pestanas: number;
+  /** en el lugar del pie bajo el video (cuando no cabe), en vez de flotando abajo a la derecha */
+  enColumna?: boolean;
+}) {
   return (
-    <div className={`atajos-flotantes${abierto ? " abierto" : ""}`}>
+    <div className={`atajos-flotantes${abierto ? " abierto" : ""}${enColumna ? " en-columna" : ""}`}>
       {abierto && <ListaAtajos pestanas={pestanas} className="atajos-lista" forma="columnas" />}
       <button className="atajos-pastilla" onClick={alternar} title="Atajos de teclado (?)">
         <kbd>?</kbd> {abierto ? "Ocultar atajos" : "Atajos"}

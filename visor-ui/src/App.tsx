@@ -391,7 +391,13 @@ export default function App() {
             }
           />
           <Leyenda lineas={lineas} hablantes={datos.hablantes} lineaActiva={lineaActiva} />
-          <ListaAtajos ref={pie} pestanas={tiposPestana.length} className={`atajos${pieCabe ? "" : " no-cabe"}`} forma="filas" />
+          <div className="pie-atajos">
+            <ListaAtajos ref={pie} pestanas={tiposPestana.length} className={`atajos${pieCabe ? "" : " no-cabe"}`} forma="filas" />
+            {/* Si no caben, en su lugar (bajo los hablantes) queda la pastilla que los abre. */}
+            {!pieCabe && !enPantallaCompleta && (
+              <AtajosFlotantes enColumna abierto={atajosAbiertos} alternar={() => setAtajosAbiertos((v) => !v)} pestanas={tiposPestana.length} />
+            )}
+          </div>
         </section>
         <section
           ref={columnaTexto}
@@ -461,7 +467,7 @@ export default function App() {
             onEscape={cerrarBusqueda}
           />
         )}
-        {(enPantallaCompleta || atajosAbiertos || !pieCabe) && (
+        {(enPantallaCompleta || (atajosAbiertos && pieCabe)) && (
           <AtajosFlotantes abierto={atajosAbiertos} alternar={() => setAtajosAbiertos((v) => !v)} pestanas={tiposPestana.length} />
         )}
       </Flotante>

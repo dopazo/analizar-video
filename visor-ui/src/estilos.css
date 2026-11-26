@@ -347,7 +347,8 @@ button { font: inherit; color: inherit; }
 /* Atajos por grupo. Bajo el video ("filas"): cada grupo es un renglón con su
    nombre a la izquierda y los atajos seguidos. En el flotante ("columnas"):
    tres columnas, un atajo por renglón. */
-.atajos { margin: auto 0 0; padding-top: 4px; font-size: 12px; color: var(--tenue); }
+.pie-atajos { margin: auto 0 0; position: relative; }
+.atajos { padding-top: 4px; font-size: 12px; color: var(--tenue); }
 /* No cabe entero: se oculta sin sacarlo del flujo (así se puede seguir midiendo). */
 .atajos.no-cabe { visibility: hidden; }
 .atajos-grupo h3 {
@@ -718,6 +719,10 @@ video::cue { color: transparent; background: transparent; text-shadow: none; }
   opacity: 0.7; transition: opacity 0.15s;
 }
 .atajos-pastilla:hover, .atajos-flotantes.abierto .atajos-pastilla { opacity: 1; }
+/* En la columna del video, donde iba el pie: arriba a la izquierda de ese
+   espacio, y la lista se abre hacia arriba, sobre el video. */
+.atajos-flotantes.en-columna { position: absolute; left: 0; top: 4px; right: auto; bottom: auto; z-index: 20; align-items: flex-start; }
+.atajos-flotantes.en-columna .atajos-lista { position: absolute; left: 0; bottom: calc(100% + 8px); }
 .atajos-lista {
   padding: 14px 16px; border-radius: 12px; font-size: 12.5px;
   display: grid; grid-template-columns: repeat(3, auto); gap: 4px 28px;

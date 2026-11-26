@@ -57,8 +57,10 @@ echo "Instalada en $destino/analizar-video"
 ```
 
 Después instala lo que pide: [uv](https://docs.astral.sh/uv/) y `ffmpeg` (git
-solo si vas a diarizar). El detalle por sistema, y sin permisos de
-administrador, está en [Requisitos](#requisitos).
+solo si vas a diarizar), y descarga el modelo de transcripción. El detalle por
+sistema, y sin permisos de administrador, está en [Requisitos](#requisitos) y
+[Modelo de transcripción](#modelo-de-transcripción). Para usarla sin agente, mira
+"Uso directo de los scripts" en [Detalles técnicos](#detalles-técnicos).
 
 ## Qué puedes pedirle
 
@@ -275,6 +277,22 @@ si no los tienes, mira la alternativa más abajo.
 
 `check_env.py` revisa todo esto y dice qué falta.
 
+### Modelo de transcripción
+
+Lo último que falta es el modelo de Whisper. `transcribe.py` nunca lo descarga
+por su cuenta (ver "Modelos de Whisper" abajo), así que hay que bajarlo una vez.
+`large-v3-turbo` (~1,5 GB) es el equilibrio recomendado; en un equipo sin GPU,
+`small` (~460 MB) es bastante más rápido. Igual en Windows, macOS y Linux:
+
+```bash
+uv run --with faster-whisper python -c "from faster_whisper import download_model; download_model('large-v3-turbo')"
+```
+
+Queda en la caché de Hugging Face (`~/.cache/huggingface/hub`) y lo reutilizan
+todas las corridas. Otra forma: la primera transcripción con `--download`
+autoriza bajarlo en el momento. Vuelve a correr `check_env.py` para confirmar
+que aparece entre los modelos descargados.
+
 ## Detalles técnicos
 
 <details>
@@ -347,6 +365,48 @@ uv run .claude/skills/analizar-video/scripts/extract_frame.py charla.mov \
 
 <details>
 <summary><b>Uso directo de los scripts</b></summary>
+
+Todo funciona sin agente. Con el [Entorno](#entorno) listo (uv, ffmpeg y el
+modelo), esto lleva un video hasta el visor. Desde la carpeta del video, con la
+skill instalada en `~/.claude/skills/analizar-video`:
+
+```bash
+# 1. Transcribir. --words guarda los tiempos por palabra: el visor los usa
+#    para resaltar la palabra que suena, y diarizar.py para saber quién habla.
+uv run ~/.claude/skills/analizar-video/scripts/transcribe.py reunion.mp4 --model large-v3-turbo --words
+
+# 2. (Opcional) Quién habla. Deja un _hablantes.txt con speaker_0, speaker_1…
+uv run ~/.claude/skills/analizar-video/scripts/diarizar.py reunion.mp4 --palabras reunion_analisis/reunion_transcripcion_<fecha>_palabras.jsonl
+
+# 3. Abrir el visor
+uv run ~/.claude/skills/analizar-video/scripts/visor.py reunion.mp4
+```
+
+En PowerShell, cambia `~` por `$HOME`, y en el paso 2 escribe el nombre real
+del `_palabras.jsonl` (PowerShell no expande el `*`).
+
+Para ponerles nombre a los hablantes, copia el `_hablantes.txt` como
+`_hablantes_corregido.txt` y reemplaza cada `speaker_N` por el nombre: el visor
+prefiere esa versión.
+
+**Resumen e índice sin agente.** Los redacta el agente, pero el visor solo lee
+archivos `.md` en `reunion_analisis/`, así que puedes escribirlos tú o pegar el
+de otra herramienta. Basta con el nombre:
+
+- `reunion_resumen_<yymmdd_hhmmss>.md` aparece en la pestaña Resumen.
+- `reunion_indice_<yymmdd_hhmmss>.md` aparece en la pestaña Índice, y cada línea
+  con un timestamp además parte la barra de tiempo en un capítulo
+  (`- [00:05:30] Tablero de operaciones`).
+
+En ambos, cada `[HH:MM:SS]` se vuelve un enlace a ese momento del video. Si hay
+varios, el visor muestra el de fecha más reciente. Con el visor abierto, el
+botón de recargar los trae sin perder el punto del video.
+
+Opciones del visor: `--navegador` abre una pestaña en vez de una ventana
+propia, `--no-open` solo imprime la URL, `--port` cambia el puerto (4810 por
+defecto) y `--mantener` evita que se apague al cerrar la ventana.
+
+Resto de los scripts:
 
 ```bash
 SKILL=.claude/skills/analizar-video
